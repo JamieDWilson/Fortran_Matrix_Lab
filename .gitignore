@@ -1,0 +1,6 @@
+*.o
+*.mod
+data/
+experiments/
+log/
+output/
