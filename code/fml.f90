@@ -23,6 +23,10 @@ print*,'Running model...'
 ! run simulation
 call cpu_time(start)
 
+call calc_C_consts()
+call calc_pCO2()
+print*,C(1,ipCO2)
+
 do t=1,gen_runtime_years*tm_n_dt
 
 	J(:,:)=0.0

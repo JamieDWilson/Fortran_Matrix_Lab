@@ -78,9 +78,27 @@ elseif(bg_n_euphotic_lyrs.eq.2)then
 	n_euphotic_boxes=8840
 end if
 
+n_surface_boxes=4448
+
 ! tracer indices
 iPO4=1
 iDOP=2
+iDIC=3
+iALK=4
+
+iK1=1
+iK2=2
+iK0=3
+iKB=4
+iKw=5
+iKSi=6
+iKp1=7
+iKp2=8
+iKp3=9
+
+ipCO2=1
+iCO3=2
+iH=3
 
 ! set-up sparse matrices
 Aexp%nnz=tm_Aexp_nnz
@@ -101,6 +119,8 @@ allocate(Aremin%col(Aremin%nnz))
 
 allocate(tracers(tm_nbox,gen_n_tracers))
 allocate(tracers_1(tm_nbox,gen_n_tracers))
+allocate(C(tm_nbox,3))
+allocate(C_consts(tm_nbox,9))
 allocate(J(tm_nbox,gen_n_tracers))
 allocate(particles(tm_nbox,gen_n_tracers))
 allocate(export(tm_nbox))
@@ -110,6 +130,9 @@ allocate(EXPORT_int(tm_nbox,n_seasonal))
 
 allocate(iSur(n_euphotic_boxes))
 allocate(tm_seaice_frac(n_euphotic_boxes,n_seasonal))
+allocate(tm_windspeed(n_surface_boxes,n_seasonal))
+allocate(tm_T(tm_nbox,n_seasonal))
+allocate(tm_S(tm_nbox,n_seasonal))
 allocate(bg_PO4_obs(n_euphotic_boxes,n_seasonal))
 allocate(bg_PO4_uptake(n_euphotic_boxes,n_seasonal))
 
@@ -124,9 +147,11 @@ end do
 ! initialise tracer array
 if(gen_restart_select)then
 else
-	tracers_1(:,1)=bg_PO4_init
-	tracers_1(:,2)=bg_DOC_init
-end if
+	tracers_1(:,iPO4)=bg_PO4_init
+	tracers_1(:,iDOP)=bg_DOC_init
+	tracers_1(:,iDIC)=bg_DIC_init
+	tracers_1(:,iALK)=bg_ALK_init
+	end if
 tracers(:,:)=0.0
 J(:,:)=0.0
 tracers_PO4_int(:,:)=0.0
@@ -135,6 +160,11 @@ EXPORT_int(:,:)=0.0
 dt_count=1 ! keep track of how many timesteps have passed in one year
 
 
+! temporary code
+C(:,:)=-1.0
+C_consts(:,:)=0.0
+tm_T(:,:)=20.0
+tm_S(:,:)=34.7
 
 
 

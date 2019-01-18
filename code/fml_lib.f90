@@ -34,6 +34,8 @@ integer::bg_n_euphotic_lyrs
 namelist / tm_namelist / bg_n_euphotic_lyrs
 logical::bg_PO4restore_select
 namelist / tm_namelist / bg_PO4restore_select
+logical::bg_O_select,bg_C_select
+namelist / tm_namelist / bg_O_select,bg_C_select
 
 ! general model parameters
 integer::gen_n_tracers
@@ -65,6 +67,9 @@ type(sparse)::Aremin
 !integer(kind=2),dimension(:),allocatable::tm_i,tm_j,tm_k
 real,dimension(:,:),allocatable::tm_seaice_frac
 real,dimension(:),allocatable::tm_vol
+real,dimension(:,:),allocatable::tm_windspeed
+real,dimension(:,:),allocatable::tm_T
+real,dimension(:,:),allocatable::tm_S
 
 real,dimension(:),allocatable::bg_martin_b
 real,dimension(:,:),allocatable::bg_PO4_obs
@@ -72,6 +77,8 @@ real,dimension(:,:),allocatable::bg_PO4_uptake
 
 real,dimension(:,:),allocatable::tracers
 real,dimension(:,:),allocatable::tracers_1
+real,dimension(:,:),allocatable::C
+real,dimension(:,:),allocatable::C_consts
 real,dimension(:,:),allocatable::J
 real,dimension(:,:),allocatable::particles
 real,dimension(:),allocatable::export
@@ -85,8 +92,12 @@ real::gen_conv_d_yr=365.25
 real::bg_DOC_rfrac
 REAL::bg_PO4_init=2.17/1e3 ! initial PO4 (mmol m-3 -> mol m-3) (Kriest et al., 2010)
 REAL::bg_DOC_init=0.0001/1e3 ! inital DOP (mmol m-3 -> mol m-3) (Kriest et al., 2010)
+real::bg_DIC_init=2030/1e3
+real::bg_ALK_init=2030/1e3
 real::bg_dt
-integer::iPO4,iDOP
+integer::iPO4,iDOP,iDIC,iALK
+integer::ipCO2,iCO3,iH
+integer::iK1,iK2,iKw,iKp1,iKp2,iKp3,iKSi,iKb,iK0
 
 real,dimension(:),allocatable::tm_seasonal_scale
 real,dimension(:),allocatable::tm_seasonal_rscale
@@ -95,6 +106,7 @@ integer,dimension(:),allocatable::tm_seasonal_n2
 integer::dt_count
 integer::n_seasonal
 integer::n_euphotic_boxes
+integer::n_surface_boxes
 
 logical::gen_restart_select=.false.
 character(len=100)::gen_config_filename,gen_restart_filename
