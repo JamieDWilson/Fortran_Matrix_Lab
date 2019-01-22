@@ -136,6 +136,12 @@ allocate(tm_S(tm_nbox,n_seasonal))
 allocate(bg_PO4_obs(n_euphotic_boxes,n_seasonal))
 allocate(bg_PO4_uptake(n_euphotic_boxes,n_seasonal))
 
+allocate(seaice_dt(n_euphotic_boxes))
+allocate(wind_dt(n_euphotic_boxes))
+allocate(T_dt(tm_nbox))
+allocate(S_dt(tm_nbox))
+
+
 allocate(tm_vol(tm_nbox))
 
 ! surface indices (are the first 4448 entries to the vector)
@@ -165,6 +171,7 @@ C(:,:)=-1.0
 C_consts(:,:)=0.0
 tm_T(:,:)=20.0
 tm_S(:,:)=34.7
+tm_windspeed(:,:)=0.0
 
 
 
@@ -728,6 +735,37 @@ if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
 print*,'Output written to: ','../output/'//trim(gen_config_filename)//'.nc'
 
 end subroutine write_output_netcdf
+
+! ---------------------------------------------------------------------------------------!
+
+! ---------------------------------------------------------------------------------------!
+
+subroutine tm_vars_at_dt()
+
+! linearly interpolate seaice, windstress, T, S at timestep
+! tm_seasonal_scale, tm_seasonal_rscale, tm_seasonal_n1, tm_seasonal, n2: from calc_seasonal_scaling
+! dt_count: fml.f90
+
+!print*,dt_count,tm_seasonal_scale,tm_seasonal_rscale,tm_seasonal_n1,tm_seasonal_n2
+
+seaice_dt=(tm_seasonal_scale(dt_count)*tm_seaice_frac(:,tm_seasonal_n1(dt_count))) &
++ &
+((tm_seasonal_rscale(dt_count))*tm_seaice_frac(:,tm_seasonal_n2(dt_count)))
+
+wind_dt=(tm_seasonal_scale(dt_count)*tm_windspeed(:,tm_seasonal_n1(dt_count))) &
++ &
+((tm_seasonal_rscale(dt_count))*tm_windspeed(:,tm_seasonal_n2(dt_count)))
+
+T_dt=(tm_seasonal_scale(dt_count)*tm_T(:,tm_seasonal_n1(dt_count))) &
++ &
+((tm_seasonal_rscale(dt_count))*tm_T(:,tm_seasonal_n2(dt_count)))
+
+S_dt=(tm_seasonal_scale(dt_count)*tm_S(:,tm_seasonal_n1(dt_count))) &
++ &
+((tm_seasonal_rscale(dt_count))*tm_S(:,tm_seasonal_n2(dt_count)))
+
+
+end subroutine tm_vars_at_dt
 
 ! ---------------------------------------------------------------------------------------!
 

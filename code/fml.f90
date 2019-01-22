@@ -23,10 +23,6 @@ print*,'Running model...'
 ! run simulation
 call cpu_time(start)
 
-call calc_C_consts()
-call calc_pCO2()
-print*,C(1,ipCO2)
-
 do t=1,gen_runtime_years*tm_n_dt
 
 	J(:,:)=0.0
@@ -34,12 +30,15 @@ do t=1,gen_runtime_years*tm_n_dt
 	export(:)=0.0
 
 	if(mod(t,bg_dt_ratio)==0)THEN ! circulation + biogeochemistry step
+	
+		call tm_vars_at_dt() 
+		
+		call calc_C_consts()
+		call calc_pCO2()
 		
 		call PO4_uptake()
 		
-		J(:,iPO4)=J(:,iPO4)+amul_remin(Aremin,(particles(:,iPO4))) ! POP remineralisation
-		!print*,sum(amul_remin(Aremin,(particles(:,iPO4)))*tm_vol)
-		!print*,sum(particles(:,iPO4)*tm_vol)
+		call POP_remin()
 				
 		call DOP_remin()
 		

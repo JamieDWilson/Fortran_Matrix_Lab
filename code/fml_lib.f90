@@ -71,6 +71,11 @@ real,dimension(:,:),allocatable::tm_windspeed
 real,dimension(:,:),allocatable::tm_T
 real,dimension(:,:),allocatable::tm_S
 
+real,dimension(:),allocatable::seaice_dt
+real,dimension(:),allocatable::wind_dt
+real,dimension(:),allocatable::T_dt
+real,dimension(:),allocatable::S_dt
+
 real,dimension(:),allocatable::bg_martin_b
 real,dimension(:,:),allocatable::bg_PO4_obs
 real,dimension(:,:),allocatable::bg_PO4_uptake
@@ -110,6 +115,9 @@ integer::n_surface_boxes
 
 logical::gen_restart_select=.false.
 character(len=100)::gen_config_filename,gen_restart_filename
+
+real::bg_C_to_P=116.0
+real::bg_N_to_P=16.0
 
 
 contains

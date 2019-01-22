@@ -1,6 +1,7 @@
 module bg_module
 
 use fml_lib
+use tm_module
 
 implicit none
 contains
@@ -13,52 +14,50 @@ subroutine PO4_uptake()
 
 integer::n
 real::uptake
-real,dimension(n_euphotic_boxes)::tmp_Fice,tmp_PO4
+real,dimension(n_euphotic_boxes)::tmp_PO4
 
 ! linearly interpolate seaice arrays
-tmp_Fice=(tm_seasonal_scale(dt_count)*tm_seaice_frac(:,tm_seasonal_n1(dt_count)))&
-+&
-((tm_seasonal_rscale(dt_count))*tm_seaice_frac(:,tm_seasonal_n2(dt_count)))
+!tmp_Fice=(tm_seasonal_scale(dt_count)*tm_seaice_frac(:,tm_seasonal_n1(dt_count)))&
+!+&
+!((tm_seasonal_rscale(dt_count))*tm_seaice_frac(:,tm_seasonal_n2(dt_count)))
 
-if(bg_PO4restore_select)then
+do n=1,n_euphotic_boxes
 
-	! linearly interpolate PO4 obs arrays
-	tmp_PO4=(tm_seasonal_scale(dt_count)*bg_PO4_obs(:,tm_seasonal_n1(dt_count)))&
-	+&
-	((tm_seasonal_rscale(dt_count))*bg_PO4_obs(:,tm_seasonal_n2(dt_count)))
+	uptake=0.0
 
-	do n=1,n_euphotic_boxes
-		if(tracers_1(n,iPO4)>tmp_PO4(n))then
-			uptake=tmp_Fice(n)*bg_uptake_tau*(tracers_1(n,iPO4)-tmp_PO4(n)) ! PO4 uptake
-			export(n)=uptake ! export for saving output
-			
-			J(n,iPO4)=J(n,iPO4)-uptake ! PO4
-			J(n,iDOP)=J(n,iDOP)+bg_DOC_frac*uptake ! DOP
-			particles(n,iPO4)=particles(n,iPO4)+bg_DOC_rfrac*uptake ! POP
-			
-		end if
-	end do
-	
-	
+	if(bg_PO4restore_select)then
+
+		! linearly interpolate PO4 obs arrays
+		tmp_PO4=(tm_seasonal_scale(dt_count)*bg_PO4_obs(:,tm_seasonal_n1(dt_count)))&
+		+&
+		((tm_seasonal_rscale(dt_count))*bg_PO4_obs(:,tm_seasonal_n2(dt_count)))
+
+		if(tracers_1(n,iPO4)>tmp_PO4(n)) uptake=seaice_dt(n)*bg_uptake_tau*(tracers_1(n,iPO4)-tmp_PO4(n)) ! PO4 uptake
+
 	else
-	! linearly interpolate PO4 uptake arrays
-	tmp_PO4=(tm_seasonal_scale(dt_count)*bg_PO4_uptake(:,tm_seasonal_n1(dt_count)))&
-	+&
-	(tm_seasonal_rscale(dt_count)*bg_PO4_uptake(:,tm_seasonal_n2(dt_count)))
-
-	do n=1,n_euphotic_boxes
-		if(tracers_1(n,iPO4)-(tmp_PO4(n)*bg_dt)>0.0)then ! if fixed export does not create negative tracer
-			uptake=tmp_PO4(n) ! PO4 uptake
-			export(n)=uptake! export for saving output
-			
-			J(n,iPO4)=J(n,iPO4)-uptake ! PO4
-			J(n,iDOP)=J(n,iDOP)+bg_DOC_frac*uptake ! DOP
-			particles(n,iPO4)=particles(n,iPO4)+bg_DOC_rfrac*uptake ! POP
-			
-		end if
-	end do
 	
-end if
+		! linearly interpolate PO4 uptake arrays
+		tmp_PO4=(tm_seasonal_scale(dt_count)*bg_PO4_uptake(:,tm_seasonal_n1(dt_count)))&
+		+&
+		(tm_seasonal_rscale(dt_count)*bg_PO4_uptake(:,tm_seasonal_n2(dt_count)))
+
+
+		if(tracers_1(n,iPO4)-(tmp_PO4(n)*bg_dt)>0.0) uptake=tmp_PO4(n) ! PO4 uptake
+			
+	end if
+	
+	J(n,iPO4)=J(n,iPO4)-uptake ! PO4
+	J(n,iDOP)=J(n,iDOP)+bg_DOC_frac*uptake ! DOP
+	particles(n,iPO4)=particles(n,iPO4)+bg_DOC_rfrac*uptake ! POP	
+	
+	if(bg_C_select)then
+		J(n,iDIC)=J(n,iDIC)-uptake*bg_C_to_P
+		J(n,iALK)=J(n,iALK)+uptake*bg_N_to_P
+	end if
+	
+	export(n)=uptake! export for saving output
+	
+end do
 	
 
 
@@ -82,12 +81,45 @@ do n=1,tm_nbox
 			J(n,iPO4)=J(n,iPO4)+remin ! DOP remin -> PO4
 			J(n,iDOP)=J(n,iDOP)-remin ! DOP remin <- DOP
 		end if
+		
+		!if(bg_O_select)then
+		!	J(n,iO2)=J(n,iO2)+remin*bg_P_to_O
+		!endif
+		
+		if(bg_C_select)then
+			J(n,iDIC)=J(n,iDIC)+remin*bg_C_to_P
+			J(n,iALK)=J(n,iALK)-remin*bg_N_to_P
+		end if
+		
 	
 	end if
 
 end do
 
 end subroutine DOP_remin
+
+! ---------------------------------------------------------------------------------------!
+
+! ---------------------------------------------------------------------------------------!
+
+subroutine POP_remin()
+
+real,dimension(tm_nbox)::remin
+
+remin=amul_remin(Aremin,(particles(:,iPO4))) ! POP remineralisation
+J(:,iPO4)=J(:,iPO4)+remin
+
+!print*,sum(amul_remin(Aremin,(particles(:,iPO4)))*tm_vol)
+!print*,sum(particles(:,iPO4)*tm_vol)
+
+if(bg_C_select)then
+	J(:,iDIC)=J(:,iDIC)+remin*bg_C_to_P
+	J(:,iALK)=J(:,iALK)-remin*bg_N_to_P
+endif
+
+
+end subroutine POP_remin
+
 
 ! ---------------------------------------------------------------------------------------!
 
