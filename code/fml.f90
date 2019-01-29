@@ -33,14 +33,18 @@ do t=1,gen_runtime_years*tm_n_dt
 	
 		call tm_vars_at_dt() 
 		
+		if(bg_C_select)then
 		call calc_C_consts()
 		call calc_pCO2()
+		end if
 		
 		call PO4_uptake()
 		
 		call POP_remin()
 				
 		call DOP_remin()
+		
+		call calc_gasexchange()
 		
 		call cpu_time(start2)
 		tracers=amul(Aexp,tracers_1)

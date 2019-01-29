@@ -3,7 +3,7 @@ module fml_lib
 implicit none
 save
 
-! namelist definitions
+! ******************* namelist definitions ***********************!
 ! tm parameters
 CHARACTER(LEN=100)::tm_Aexp_filename,tm_Aimp_filename,tm_Aremin_filename
 namelist /tm_namelist/ tm_Aexp_filename,tm_Aimp_filename, tm_Aremin_filename
@@ -60,7 +60,7 @@ type(sparse)::Aremin
 !type(sparse)::I
 
 
-
+! ******************* allocatable ***********************!
 ! real,dimension(:),allocatable::tm_Aexp,tm_Aimp,tm_Aremin
 ! integer,dimension(:),allocatable::tm_Aexp_col,tm_Aimp_col,tm_Aremin_col	
 ! integer,dimension(:),allocatable::tm_Aexp_row,tm_Aimp_row,tm_Aremin_row
@@ -70,6 +70,7 @@ real,dimension(:),allocatable::tm_vol
 real,dimension(:,:),allocatable::tm_windspeed
 real,dimension(:,:),allocatable::tm_T
 real,dimension(:,:),allocatable::tm_S
+real,dimension(:),allocatable::tm_area
 
 real,dimension(:),allocatable::seaice_dt
 real,dimension(:),allocatable::wind_dt
@@ -86,13 +87,14 @@ real,dimension(:,:),allocatable::C
 real,dimension(:,:),allocatable::C_consts
 real,dimension(:,:),allocatable::J
 real,dimension(:,:),allocatable::particles
+real,dimension(:),allocatable::ATM
 real,dimension(:),allocatable::export
 real,dimension(:,:),allocatable::tracers_PO4_int,tracers_DOP_int,EXPORT_int
 
 integer,dimension(:),allocatable::iSur
 
 
-
+! ******************* global variables ***********************!
 real::gen_conv_d_yr=365.25
 real::bg_DOC_rfrac
 REAL::bg_PO4_init=2.17/1e3 ! initial PO4 (mmol m-3 -> mol m-3) (Kriest et al., 2010)
@@ -100,9 +102,10 @@ REAL::bg_DOC_init=0.0001/1e3 ! inital DOP (mmol m-3 -> mol m-3) (Kriest et al., 
 real::bg_DIC_init=2030/1e3
 real::bg_ALK_init=2030/1e3
 real::bg_dt
-integer::iPO4,iDOP,iDIC,iALK
-integer::ipCO2,iCO3,iH
+integer::ioPO4,ioDOP,ioDIC,ioALK
+integer::ioCO2,ioCO3,ioH
 integer::iK1,iK2,iKw,iKp1,iKp2,iKp3,iKSi,iKb,iK0
+integer::iaO2,iaCO2
 
 real,dimension(:),allocatable::tm_seasonal_scale
 real,dimension(:),allocatable::tm_seasonal_rscale
@@ -118,6 +121,17 @@ character(len=100)::gen_config_filename,gen_restart_filename
 
 real::bg_C_to_P=116.0
 real::bg_N_to_P=16.0
+
+real,dimension(5,2)::Sc_coeffs ! 4 if using older values
+real,dimension(6,2)::Bunsen_coeffs
+real,dimension(7,2)::Sol_Orr 
+
+integer::n_ATM_tracers
+real::ATM_vol
+real::ATM_mol
+real::bg_gastransfer_a=251 ! see Orr et al., (2017), eqn. 13
+real::rho=1024.5 ! kg m-3
+
 
 
 contains

@@ -32,7 +32,7 @@ do n=1,n_euphotic_boxes
 		+&
 		((tm_seasonal_rscale(dt_count))*bg_PO4_obs(:,tm_seasonal_n2(dt_count)))
 
-		if(tracers_1(n,iPO4)>tmp_PO4(n)) uptake=seaice_dt(n)*bg_uptake_tau*(tracers_1(n,iPO4)-tmp_PO4(n)) ! PO4 uptake
+		if(tracers_1(n,ioPO4)>tmp_PO4(n)) uptake=seaice_dt(n)*bg_uptake_tau*(tracers_1(n,ioPO4)-tmp_PO4(n)) ! PO4 uptake
 
 	else
 	
@@ -42,17 +42,17 @@ do n=1,n_euphotic_boxes
 		(tm_seasonal_rscale(dt_count)*bg_PO4_uptake(:,tm_seasonal_n2(dt_count)))
 
 
-		if(tracers_1(n,iPO4)-(tmp_PO4(n)*bg_dt)>0.0) uptake=tmp_PO4(n) ! PO4 uptake
+		if(tracers_1(n,ioPO4)-(tmp_PO4(n)*bg_dt)>0.0) uptake=tmp_PO4(n) ! PO4 uptake
 			
 	end if
 	
-	J(n,iPO4)=J(n,iPO4)-uptake ! PO4
-	J(n,iDOP)=J(n,iDOP)+bg_DOC_frac*uptake ! DOP
-	particles(n,iPO4)=particles(n,iPO4)+bg_DOC_rfrac*uptake ! POP	
+	J(n,ioPO4)=J(n,ioPO4)-uptake ! PO4
+	J(n,ioDOP)=J(n,ioDOP)+bg_DOC_frac*uptake ! DOP
+	particles(n,ioPO4)=particles(n,ioPO4)+bg_DOC_rfrac*uptake ! POP	
 	
 	if(bg_C_select)then
-		J(n,iDIC)=J(n,iDIC)-uptake*bg_C_to_P
-		J(n,iALK)=J(n,iALK)+uptake*bg_N_to_P
+		J(n,ioDIC)=J(n,ioDIC)-uptake*bg_C_to_P
+		J(n,ioALK)=J(n,ioALK)+uptake*bg_N_to_P
 	end if
 	
 	export(n)=uptake! export for saving output
@@ -74,12 +74,12 @@ real::remin
 
 do n=1,tm_nbox
 
-	if(tracers_1(n,iDOP).gt.1e-8)then ! Kriest et al., (2010) . Also smaller concentrations slow down the matrix calculation significantly.
-		remin=tracers_1(n,iDOP)*bg_DOC_k
+	if(tracers_1(n,ioDOP).gt.1e-8)then ! Kriest et al., (2010) . Also smaller concentrations slow down the matrix calculation significantly.
+		remin=tracers_1(n,ioDOP)*bg_DOC_k
 		
-		if(remin*bg_dt.lt.tracers_1(n,iDOP))then ! catch remineralisation making DOP go negative
-			J(n,iPO4)=J(n,iPO4)+remin ! DOP remin -> PO4
-			J(n,iDOP)=J(n,iDOP)-remin ! DOP remin <- DOP
+		if(remin*bg_dt.lt.tracers_1(n,ioDOP))then ! catch remineralisation making DOP go negative
+			J(n,ioPO4)=J(n,ioPO4)+remin ! DOP remin -> PO4
+			J(n,ioDOP)=J(n,ioDOP)-remin ! DOP remin <- DOP
 		end if
 		
 		!if(bg_O_select)then
@@ -87,8 +87,8 @@ do n=1,tm_nbox
 		!endif
 		
 		if(bg_C_select)then
-			J(n,iDIC)=J(n,iDIC)+remin*bg_C_to_P
-			J(n,iALK)=J(n,iALK)-remin*bg_N_to_P
+			J(n,ioDIC)=J(n,ioDIC)+remin*bg_C_to_P
+			J(n,ioALK)=J(n,ioALK)-remin*bg_N_to_P
 		end if
 		
 	
@@ -106,15 +106,15 @@ subroutine POP_remin()
 
 real,dimension(tm_nbox)::remin
 
-remin=amul_remin(Aremin,(particles(:,iPO4))) ! POP remineralisation
-J(:,iPO4)=J(:,iPO4)+remin
+remin=amul_remin(Aremin,(particles(:,ioPO4))) ! POP remineralisation
+J(:,ioPO4)=J(:,ioPO4)+remin
 
-!print*,sum(amul_remin(Aremin,(particles(:,iPO4)))*tm_vol)
-!print*,sum(particles(:,iPO4)*tm_vol)
+!print*,sum(amul_remin(Aremin,(particles(:,ioPO4)))*tm_vol)
+!print*,sum(particles(:,ioPO4)*tm_vol)
 
 if(bg_C_select)then
-	J(:,iDIC)=J(:,iDIC)+remin*bg_C_to_P
-	J(:,iALK)=J(:,iALK)-remin*bg_N_to_P
+	J(:,ioDIC)=J(:,ioDIC)+remin*bg_C_to_P
+	J(:,ioALK)=J(:,ioALK)-remin*bg_N_to_P
 endif
 
 
@@ -147,8 +147,8 @@ subroutine integrate_output(save_count)
 
 integer,intent(inOUT)::save_count
 
-tracers_PO4_int(:,save_count)=tracers_PO4_int(:,save_count)+tracers(:,iPO4)*tm_dt*n_seasonal
-tracers_DOP_int(:,save_count)=tracers_DOP_int(:,save_count)+tracers(:,iDOP)*tm_dt*n_seasonal
+tracers_PO4_int(:,save_count)=tracers_PO4_int(:,save_count)+tracers(:,ioPO4)*tm_dt*n_seasonal
+tracers_DOP_int(:,save_count)=tracers_DOP_int(:,save_count)+tracers(:,ioDOP)*tm_dt*n_seasonal
 EXPORT_int(:,save_count)=EXPORT_int(:,save_count)+export(:)*tm_dt*n_seasonal
 
 if(mod(dt_count,tm_n_dt/n_seasonal).eq.0 .and. tm_seasonal)then
@@ -170,8 +170,8 @@ integer::n
 ! to do: add C_consts to fml_lib.f90
 do n=1,n_surface_boxes
 
-	T = tm_T(n,1)+273.15
-	S = tm_S(n,1)
+	T = T_dt(n)+273.15
+	S = S_dt(n)
 	
 	! K1
 	C_consts(n,iK1)=exp(2.83655-2307.1266/T-1.5529413*log(T) &
@@ -274,11 +274,11 @@ integer::n
 do n=1,n_surface_boxes
 
 ! initialise variables
-dic=tracers_1(n,iDIC)
-ta=tracers_1(n,iALK)
-pt=tracers_1(n,iPO4)
+dic=tracers_1(n,ioDIC)
+ta=tracers_1(n,ioALK)
+pt=tracers_1(n,ioPO4)
 sit=0.0
-bt=4.16e-4*(tm_S(n,1)/35.0) ! total boron conc. from ZW2001
+bt=4.16e-4*(S_dt(n)/35.0) ! total boron conc. from ZW2001
 k1=C_consts(n,iK1)
 k2=C_consts(n,iK2)
 kw=C_consts(n,iKw)
@@ -291,10 +291,10 @@ k0=C_consts(n,iK0)
 
 ! First guess of [H+]: from last timestep *OR* fixed for cold start
 
-if(C(n,iH).eq.-1.0)then
+if(C(n,ioH).eq.-1.0)then
 	hg=1.0e-9 ! cold start
 	else
-	hg=C(n,iH) ! previous timestep
+	hg=C(n,ioH) ! previous timestep
 endif
 
 ! estimate contributions to total alk from borate, silicate, phosphate
@@ -315,11 +315,114 @@ H = 0.5*((gamm-1.0)*k1 + sqrt(dummy))
 ! evaluate [CO2*]
 co2s = dic/(1.0 + (k1/H) + (k1*k2/(H*H)))
 ! evaluate surface pCO2
-C(n,ipCO2) = co2s/k0
-C(n,iH) = H
+C(n,ioCO2) = co2s
+C(n,ioH) = H
 
 enddo
 
 end subroutine calc_pCO2
+
+! ---------------------------------------------------------------------------------------!
+
+! ---------------------------------------------------------------------------------------!
+
+subroutine calc_gasexchange()
+
+real::loc_T,loc_T2,loc_T3,loc_T4,loc_Tr100,loc_Tr1002,loc_TK,loc_S
+REAL::Sc,Bunsen,Sol,gasex
+real::kw,F_o2a,F_a2o
+real,dimension(n_ATM_tracers)::atm_dt
+integer::n
+
+atm_dt=ATM! copy ATM so can integrate main tracer below
+
+do n=1,n_surface_boxes
+
+	loc_T=T_dt(n)
+	loc_S=S_dt(n)
+	if(loc_T<-2.0)loc_T=-2.0
+	if(loc_T>40.0)loc_T=40.0
+	loc_T2=loc_T*loc_T
+	loc_T3=loc_T2*loc_T
+	loc_T4=loc_T3*loc_T
+	loc_TK=loc_T+273.15
+	loc_Tr100=loc_TK/100.0
+	loc_Tr1002=loc_Tr100*loc_Tr100
+	
+	if(bg_C_select)then
+	
+		!loc_T=T_dt(n)
+		!if(loc_T<0.0)loc_T=0.0
+		!IF(loc_T>30.0)loc_T=30.0
+		!loc_T2=loc_T*loc_T
+		!loc_T3=loc_T2*loc_T
+	
+		!Sc=Sc_coeffs(1,iaCO2)-&
+		!Sc_coeffs(2,iaCO2)*loc_T+&
+		!Sc_coeffs(3,iaCO2)*loc_T2-&
+		!Sc_coeffs(4,iaCO2)*loc_T3
+		
+		Sc=Sc_coeffs(1,iaCO2) &
+		+Sc_coeffs(2,iaCO2)*loc_T &
+		+Sc_coeffs(3,iaCO2)*loc_T2 &
+		+Sc_coeffs(4,iaCO2)*loc_T3 &
+		+Sc_coeffs(5,iaCO2)*loc_T4
+		
+		!loc_T=T_dt(n)
+		!loc_S=S_dt(n)
+		!if(loc_T<2.0)loc_T=2.0
+		!IF(loc_T>35.0)loc_T=35.0
+		!if(loc_S<26.0)loc_S=26.0
+		!IF(loc_S>43.0)loc_S=43.0
+		!loc_TK=loc_T+273.15
+		!loc_Tr100=loc_TK/100.0
+		
+		!Bunsen=exp(Bunsen_coeffs(1,iaCO2)+ &
+		!Bunsen_coeffs(2,iaCO2)*(100.0/loc_TK)+ &
+		!Bunsen_coeffs(3,iaCO2)*log(loc_Tr100)+ &
+		!loc_S* &
+		!(Bunsen_coeffs(4,iaCO2)+&
+		!Bunsen_coeffs(5,iaCO2)*loc_Tr100+&
+		!Bunsen_coeffs(6,iaCO2)*loc_Tr100*loc_Tr100))
+		
+		Sol=exp( &
+		Sol_Orr(1,iaCO2) &
+		+Sol_Orr(2,iaCO2)*loc_Tr100 &
+		+Sol_Orr(3,iaCO2)*log(loc_Tr100) &
+		+Sol_Orr(4,iaCO2)*loc_Tr1002 &
+		+loc_S* &
+		(Sol_Orr(5,iaCO2) &
+		+Sol_Orr(6,iaCO2)*loc_Tr100 &
+		+Sol_Orr(7,iaCO2)*loc_Tr1002)) ! mol m-3 atm-1
+		
+		!Bunsen=Bunsen*1024.5*1.03-6 ! mol/(kg*atm) -> mol/(m3*uatm) 
+		
+		kw=wind_dt(n)*((Sc/660.0)**(-0.5)) ! m yr-1
+		
+		F_a2o=Sol*ATM(iaCO2) ! [CO2*]sat (mol m-3)
+		!F_a2o=piston*ATM(iaCO2)*Bunsen
+		
+		F_o2a=C(n,ioCO2) ! [CO2*] (mol m-3)
+		
+		gasex=kw*(F_a2o-F_o2a)*bg_dt*50.0 ! mol m-3 dt-1 (n.b. hard coded depth in m)
+		
+		J(n,ioDIC)=J(n,ioDIC)+gasex ! update ocean source/sink
+		
+		ATM(iaCO2)=ATM(iaCO2)+gasex*tm_vol(n)/ATM_mol ! update atmosphere 
+		
+	endif
+		
+		
+	
+	
+	
+
+enddo
+
+
+
+
+
+end subroutine calc_gasexchange
 
 end module bg_module

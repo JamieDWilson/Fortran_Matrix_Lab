@@ -81,10 +81,10 @@ end if
 n_surface_boxes=4448
 
 ! tracer indices
-iPO4=1
-iDOP=2
-iDIC=3
-iALK=4
+ioPO4=1
+ioDOP=2
+ioDIC=3
+ioALK=4
 
 iK1=1
 iK2=2
@@ -96,9 +96,16 @@ iKp1=7
 iKp2=8
 iKp3=9
 
-ipCO2=1
-iCO3=2
-iH=3
+ioCO2=1
+ioCO3=2
+ioH=3
+
+iaO2=1
+iaCO2=2
+
+n_ATM_tracers=0
+if(bg_O_select) n_ATM_tracers=n_ATM_tracers+1
+IF(bg_C_select) n_ATM_tracers=n_ATM_tracers+1
 
 ! set-up sparse matrices
 Aexp%nnz=tm_Aexp_nnz
@@ -121,6 +128,7 @@ allocate(tracers(tm_nbox,gen_n_tracers))
 allocate(tracers_1(tm_nbox,gen_n_tracers))
 allocate(C(tm_nbox,3))
 allocate(C_consts(tm_nbox,9))
+allocate(ATM(n_ATM_tracers))
 allocate(J(tm_nbox,gen_n_tracers))
 allocate(particles(tm_nbox,gen_n_tracers))
 allocate(export(tm_nbox))
@@ -131,6 +139,7 @@ allocate(EXPORT_int(tm_nbox,n_seasonal))
 allocate(iSur(n_euphotic_boxes))
 allocate(tm_seaice_frac(n_euphotic_boxes,n_seasonal))
 allocate(tm_windspeed(n_surface_boxes,n_seasonal))
+allocate(tm_area(tm_nbox))
 allocate(tm_T(tm_nbox,n_seasonal))
 allocate(tm_S(tm_nbox,n_seasonal))
 allocate(bg_PO4_obs(n_euphotic_boxes,n_seasonal))
@@ -153,10 +162,10 @@ end do
 ! initialise tracer array
 if(gen_restart_select)then
 else
-	tracers_1(:,iPO4)=bg_PO4_init
-	tracers_1(:,iDOP)=bg_DOC_init
-	tracers_1(:,iDIC)=bg_DIC_init
-	tracers_1(:,iALK)=bg_ALK_init
+	tracers_1(:,ioPO4)=bg_PO4_init
+	tracers_1(:,ioDOP)=bg_DOC_init
+	tracers_1(:,ioDIC)=bg_DIC_init
+	tracers_1(:,ioALK)=bg_ALK_init
 	end if
 tracers(:,:)=0.0
 J(:,:)=0.0
@@ -165,6 +174,20 @@ tracers_DOP_int(:,:)=0.0
 EXPORT_int(:,:)=0.0
 dt_count=1 ! keep track of how many timesteps have passed in one year
 
+!Sc_coeffs(:,iaO2)=(/1953.4 , 128.00 , 3.9918 , 0.050091/)   ! O2
+!SC_coeffs(:,iaCO2)=(/2073.1 , 125.62 , 3.6276 , 0.043219/)   ! CO2
+
+Sc_coeffs(:,iaCO2)=(/2116.8 , -136.25 , 4.7353 , -0.092307 , 0.0007555/)   ! CO2 Wanninkhof (2014), Orr et al., 2017, Table 1
+SC_coeffs(:,iaO2)=(/1920.4 , -135.6 , 5.2122 , -0.10939 , 0.00093777/)   ! O2 Wanninkhof (2014), Orr et al., 2017, Table 1
+      
+Bunsen_coeffs(:,iaO2)=(/-58.3877 , 85.8079 , 23.8439 , -0.034892 , 0.015568 , -0.0019387/) ! O2
+Bunsen_coeffs(:,iaCO2)=(/ -60.2409 , 93.4517 , 23.3585 , 0.0023517 , -0.023656 , 0.0047036 /) ! CO2
+
+Sol_Orr(:,iaCO2)=(/-160.7333 , 215.4152 , 89.8920 , -1.47759 , 0.029941 , -0.027455 , 0.0053407 /) ! CO2, Orr et al., 2017, Table 2
+Sol_Orr(:,iaCO2)=Sol_Orr(:,iaCO2)*1000.0 ! mol L-1 atm-1 -> mol m-3 atm-1 (Orr et al., 2017, Table 2)
+
+ATM_vol=7777.0 * sum(tm_area(1:n_surface_boxes)) ! height (m) * total area (m2)
+ATM_mol=1.77e20 ! 
 
 ! temporary code
 C(:,:)=-1.0
@@ -172,6 +195,7 @@ C_consts(:,:)=0.0
 tm_T(:,:)=20.0
 tm_S(:,:)=34.7
 tm_windspeed(:,:)=0.0
+tm_area=1.0
 
 
 
@@ -566,7 +590,7 @@ if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
 status=nf90_inq_varid(ncid,'PO4',varid)
 if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
 
-status=nf90_get_var(ncid,varid,tracers_1(:,iPO4),start=(/ 1, 12 /),count=(/ tm_nbox , 1 /))
+status=nf90_get_var(ncid,varid,tracers_1(:,ioPO4),start=(/ 1, 12 /),count=(/ tm_nbox , 1 /))
 if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
 !print*,tracers_1(1:10,iPO4)
 
@@ -574,7 +598,7 @@ if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
 status=nf90_inq_varid(ncid,'DOP',varid)
 if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
 
-status=nf90_get_var(ncid,varid,tracers_1(:,iDOP),start=(/ 1, 12 /),count=(/ tm_nbox , 1 /))
+status=nf90_get_var(ncid,varid,tracers_1(:,ioDOP),start=(/ 1, 12 /),count=(/ tm_nbox , 1 /))
 if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
 !print*,tracers_1(1:10,iDOP)
 
@@ -763,6 +787,12 @@ T_dt=(tm_seasonal_scale(dt_count)*tm_T(:,tm_seasonal_n1(dt_count))) &
 S_dt=(tm_seasonal_scale(dt_count)*tm_S(:,tm_seasonal_n1(dt_count))) &
 + &
 ((tm_seasonal_rscale(dt_count))*tm_S(:,tm_seasonal_n2(dt_count)))
+
+! convert wind_dt to correct units for gas exchange
+! not pre-calculated due to non-linear terms (u^2)
+! b*(1-seaicefrac)*u^2 from cm/hr -> m/yr
+wind_dt=(wind_dt**2)*bg_gastransfer_a*seaice_dt*0.01*8766.0
+
 
 
 end subroutine tm_vars_at_dt
