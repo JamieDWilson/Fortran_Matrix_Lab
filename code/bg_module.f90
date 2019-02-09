@@ -26,13 +26,14 @@ do n=1,n_euphotic_boxes
 	uptake=0.0
 
 	if(bg_PO4restore_select)then
-
+		
 		! linearly interpolate PO4 obs arrays
 		tmp_PO4=(tm_seasonal_scale(dt_count)*bg_PO4_obs(:,tm_seasonal_n1(dt_count)))&
 		+&
 		((tm_seasonal_rscale(dt_count))*bg_PO4_obs(:,tm_seasonal_n2(dt_count)))
 
 		if(tracers_1(n,ioPO4)>tmp_PO4(n)) uptake=seaice_dt(n)*bg_uptake_tau*(tracers_1(n,ioPO4)-tmp_PO4(n)) ! PO4 uptake
+		
 
 	else
 	
@@ -163,8 +164,10 @@ end subroutine integrate_output
 
 subroutine calc_C_consts()
 
-!integer::BT ! total boron
-real::T,S
+! calculate carbonate system constants
+! using DOE (1994)
+
+real::T,S,I
 integer::n
 
 ! to do: add C_consts to fml_lib.f90
@@ -173,57 +176,58 @@ do n=1,n_surface_boxes
 	T = T_dt(n)+273.15
 	S = S_dt(n)
 	
-	! K1
+	! K1 (Roy et al., 1993)
 	C_consts(n,iK1)=exp(2.83655-2307.1266/T-1.5529413*log(T) &
 	-(0.207608410+4.0484/T)*sqrt(S) &
 	+0.0846834*S-0.00654208*S**(3.0/2.0)+log(1.0-0.001005*S))
 	
-	! K2
+	! K2 (Roy et al., 1993)
 	C_consts(n,iK2)=exp( &
 	-9.226508-3351.6106/T-0.2005743*log(T) &
 	-(0.106901773+23.9722/T)*sqrt(S) &
 	+0.1130822*S-0.00846934*S**(3.0/2.0)+log(1.0-0.001005*S))
 	
-	! K0
+	! K0 (Weiss 1974)
 	C_consts(n,iK0)=exp( &
 	9345.17/T-60.2409+23.3585*log(T/100.0) &
 	+S*(0.023517-0.00023656*T+0.0047036*(T/100.0)**2))
 	
-	! KB
+	! KB (Dickson 1990b(
 	C_consts(n,iKb)=exp( &
 	(-8966.90-2890.53*S**0.5-77.942*S+1.728*S**(3.0/2.0)-0.0996*S**2.0)/T &
 	+148.0248+137.1942*S**0.5+1.62142*S &
 	-(24.4344+25.085*S**0.5+0.2474*S)*log(T) &
 	+0.053105*S**0.5*T)
 	
-	! Kw
+	! Kw (Millero 1995)
 	C_consts(n,iKw)=exp( &
 	148.96502-13847.26/T-23.6521*log(T) &
 	+(118.67/T-5.977+1.0495*log(T))*S**0.5-0.01615*S)
 	
-	! KSi - needs checking!
-	!C_consts(n,iKSi)=exp( &
-	!-8904.2/T+117.385-19.334*log(T) &
-	!+(3.5913-458.79/T)*T**0.5 &
-	!+(188.74/T-1.5998)*T &
-	!+(0.07871-12.1652/T)*T**2 &
-	!+log(1.0-0.001005*S))
+	!KSi (Millero 1995)
+	I=(19.924*S)/(1000.0-1.005*S)
+	!I=0.02*S
 	
-	C_consts(n,iKsi)=1.0
+	C_consts(n,iKSi)=exp( &
+	-8904.2/T+117.385-19.334*log(T) &
+	+((-458.79/T+3.5913)*(I**(-0.5)) &
+	+(188.74/T-1.5998))*I &
+	+(-12.1652/T+0.07871)*(I**2) &
+	+log(1.0-0.001005*S))
 	
-	! KP1
+	! KP1 (Millero 1995)
 	C_consts(n,iKp1)=exp( &
 	-4576.752/T+115.525-18.453*log(T) &
 	+(-106.736/T+0.69171)*S**0.5 &
 	+(-0.65643/T-0.01844)*S)
 	
-	! KP2
+	! KP2 (Millero 1995)
 	C_consts(n,iKp2)=exp( &
 	-8814.715/T+172.0883-27.927*log(T) &
 	+(-160.34/T+1.3566)*S**0.5 &
 	+(0.37335/T-0.05778)*S)
 	
-	! KP3
+	! KP3 (millero 1995)
 	C_consts(n,iKp3)=exp( &
 	-3070.75/T-18.141 &
 	+(17.27039/T+2.81197)*S**0.5 &
@@ -232,17 +236,18 @@ do n=1,n_surface_boxes
 	
 
 enddo 
-!print*,'T',tm_T(1,1)+273.15
-!print*,'S',tm_S(1,1)
-!print*,'K1',C_consts(1,iK1)
-!print*,'K2',C_consts(1,iK2)
-!print*,'K0',C_consts(1,iK0)
-!print*,'Kw',C_consts(1,iKw)
-!print*,'KB',C_consts(1,iKB)
-!print*,'KSi',C_consts(1,iKSi)
-!print*,'Kp1',C_consts(1,iKp1)
-!print*,'Kp2',C_consts(1,iKp2)
-!print*,'Kp3',C_consts(1,iKp3)
+! compare with DOE (1994)
+!print*,'T',T
+!print*,'S',S
+!print*,'K1',log(C_consts(1,iK1))
+!print*,'K2',log(C_consts(1,iK2))
+!print*,'K0',log(C_consts(1,iK0))
+!print*,'Kw',log(C_consts(1,iKw))
+!print*,'KB',log(C_consts(1,iKB))
+!print*,'KSi',log(C_consts(1,iKSi))
+!print*,'Kp1',log(C_consts(1,iKp1))
+!print*,'Kp2',log(C_consts(1,iKp2))
+!print*,'Kp3',log(C_consts(1,iKp3))
 
 end subroutine calc_C_consts
 
@@ -274,11 +279,12 @@ integer::n
 do n=1,n_surface_boxes
 
 ! initialise variables
-dic=tracers_1(n,ioDIC)
-ta=tracers_1(n,ioALK)
-pt=tracers_1(n,ioPO4)
-sit=0.0
-bt=4.16e-4*(S_dt(n)/35.0) ! total boron conc. from ZW2001
+dic=tracers_1(n,ioDIC)*r_rho ! mol m-3 -> mol kg-1
+ta=tracers_1(n,ioALK)*r_rho ! mol m-3 -> mol kg-1
+pt=tracers_1(n,ioPO4)*r_rho ! mol m-3 -> mol kg-1
+!sit=silica_dt(n)
+sit=7.5/1.0e6 ! global mean surface (Orr et al., 2017) umol kg-1 -> mol kg-1
+bt=0.0004106*(S_dt(n)/35.0) ! total boron conc. from ZW2001 (mol kg-1)
 k1=C_consts(n,iK1)
 k2=C_consts(n,iK2)
 kw=C_consts(n,iKw)
@@ -315,7 +321,7 @@ H = 0.5*((gamm-1.0)*k1 + sqrt(dummy))
 ! evaluate [CO2*]
 co2s = dic/(1.0 + (k1/H) + (k1*k2/(H*H)))
 ! evaluate surface pCO2
-C(n,ioCO2) = co2s
+C(n,ioCO2) = co2s*rho ! mol kg-1 -> mol m-3
 C(n,ioH) = H
 
 enddo
@@ -328,7 +334,7 @@ end subroutine calc_pCO2
 
 subroutine calc_gasexchange()
 
-real::loc_T,loc_T2,loc_T3,loc_T4,loc_Tr100,loc_Tr1002,loc_TK,loc_S
+real::loc_T,loc_T2,loc_T3,loc_T4,loc_Tr100,loc_T100_2,loc_TK,loc_S,loc_T100
 REAL::Sc,Bunsen,Sol,gasex
 real::kw,F_o2a,F_a2o
 real,dimension(n_ATM_tracers)::atm_dt
@@ -346,8 +352,9 @@ do n=1,n_surface_boxes
 	loc_T3=loc_T2*loc_T
 	loc_T4=loc_T3*loc_T
 	loc_TK=loc_T+273.15
-	loc_Tr100=loc_TK/100.0
-	loc_Tr1002=loc_Tr100*loc_Tr100
+	loc_Tr100=100.0/loc_TK
+	loc_T100=loc_TK/100.0
+	loc_T100_2=loc_T100*loc_T100
 	
 	if(bg_C_select)then
 	
@@ -388,12 +395,16 @@ do n=1,n_surface_boxes
 		Sol=exp( &
 		Sol_Orr(1,iaCO2) &
 		+Sol_Orr(2,iaCO2)*loc_Tr100 &
-		+Sol_Orr(3,iaCO2)*log(loc_Tr100) &
-		+Sol_Orr(4,iaCO2)*loc_Tr1002 &
+		+Sol_Orr(3,iaCO2)*log(loc_T100) &
+		+Sol_Orr(4,iaCO2)*loc_T100_2 &
 		+loc_S* &
 		(Sol_Orr(5,iaCO2) &
-		+Sol_Orr(6,iaCO2)*loc_Tr100 &
-		+Sol_Orr(7,iaCO2)*loc_Tr1002)) ! mol m-3 atm-1
+		+Sol_Orr(6,iaCO2)*loc_T100 &
+		+Sol_Orr(7,iaCO2)*loc_T100_2)) ! mol m-3 atm-1
+		
+		!print*,Sol_Orr(1,iaCO2),Sol_Orr(2,iaCO2),Sol_Orr(3,iaCO2),Sol_Orr(4,iaCO2), &
+		!& Sol_Orr(5,iaCO2),Sol_Orr(6,iaCO2),Sol_Orr(7,iaCO2)
+		!print*,loc_T100,loc_Tr100,loc_T100_2,loc_S
 		
 		!Bunsen=Bunsen*1024.5*1.03-6 ! mol/(kg*atm) -> mol/(m3*uatm) 
 		
@@ -404,25 +415,30 @@ do n=1,n_surface_boxes
 		
 		F_o2a=C(n,ioCO2) ! [CO2*] (mol m-3)
 		
-		gasex=kw*(F_a2o-F_o2a)*bg_dt*50.0 ! mol m-3 dt-1 (n.b. hard coded depth in m)
+		gasex=kw*(F_a2o-F_o2a)*50.0 ! mol m-3 yr-1 (n.b. hard coded depth in m)
 		
+		!print*,ATM(iaCO2),C(n,ioCO2),kw,gasex,Sol,Sc,loc_T,loc_S
+		!STOP
+				
 		J(n,ioDIC)=J(n,ioDIC)+gasex ! update ocean source/sink
 		
-		ATM(iaCO2)=ATM(iaCO2)+gasex*tm_vol(n)/ATM_mol ! update atmosphere 
+		ATM(iaCO2)=ATM(iaCO2)-gasex*tm_vol(n)/ATM_mol*bg_dt ! update atmosphere 
+		
 		
 	endif
 		
-		
-	
-	
-	
-
 enddo
 
-
-
-
-
 end subroutine calc_gasexchange
+
+! ---------------------------------------------------------------------------------------!
+
+! ---------------------------------------------------------------------------------------!
+
+subroutine restore_atm_CO2()
+
+if(bg_restore_atm_CO2) ATM(iaCO2)=bg_restore_atm_CO2_target*1.0e-6
+
+end subroutine restore_atm_CO2
 
 end module bg_module

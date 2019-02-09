@@ -17,6 +17,8 @@ call initialise_model()
 call setup_model()
 ! load transport matrix data
 call load_TM_data()
+!tm_T(:,:)=25.0
+!tm_S(:,:)=35.0
 
 print*,'*************************'
 print*,'Running model...'
@@ -28,7 +30,7 @@ do t=1,gen_runtime_years*tm_n_dt
 	J(:,:)=0.0
 	particles(:,:)=0.0
 	export(:)=0.0
-
+	call cpu_time(start2)
 	if(mod(t,bg_dt_ratio)==0)THEN ! circulation + biogeochemistry step
 	
 		call tm_vars_at_dt() 
@@ -46,12 +48,14 @@ do t=1,gen_runtime_years*tm_n_dt
 		
 		call calc_gasexchange()
 		
-		call cpu_time(start2)
+		call restore_atm_CO2()
+		
+		!call cpu_time(start2)
 		tracers=amul(Aexp,tracers_1)
 		call update_bgc()
 		tracers=amul(Aimp,tracers)
 		tracers_1=tracers
-		call cpu_time(finish2)
+		!call cpu_time(finish2)
 		
 	else ! circulation only step
 		call cpu_time(start2)
@@ -59,9 +63,10 @@ do t=1,gen_runtime_years*tm_n_dt
 		tracers=amul(Aimp,tracers)
 		tracers_1=tracers
 
-		call cpu_time(finish2)
+		!call cpu_time(finish2)
 		
  	end if
+ 	call cpu_time(finish2)
 	
 	! integrate output in last year of run
 	if(t.gt.((gen_runtime_years*tm_n_dt)-tm_n_dt))then

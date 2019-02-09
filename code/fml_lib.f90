@@ -15,6 +15,8 @@ integer::tm_nbox
 namelist /tm_namelist/ tm_n_dt,tm_Aexp_nnz,tm_Aimp_nnz,tm_Aremin_nnz,tm_nbox
 character(len=100)::tm_seaice_filename,tm_PO4restore_filename,tm_vol_filename,tm_PO4uptake_filename
 namelist /tm_namelist/ tm_seaice_filename,tm_PO4restore_filename,tm_vol_filename,tm_PO4uptake_filename
+character(len=100)::tm_bgc_data_filename
+namelist /tm_namelist/ tm_bgc_data_filename
 logical::tm_seasonal
 namelist /tm_namelist/ tm_seasonal
 character(len=100)::tm_data_fileloc
@@ -36,6 +38,10 @@ logical::bg_PO4restore_select
 namelist / tm_namelist / bg_PO4restore_select
 logical::bg_O_select,bg_C_select
 namelist / tm_namelist / bg_O_select,bg_C_select
+logical::bg_restore_atm_CO2
+namelist / tm_namelist / bg_restore_atm_CO2
+real::bg_restore_atm_CO2_target
+namelist / tm_namelist / bg_restore_atm_CO2_target
 
 ! general model parameters
 integer::gen_n_tracers
@@ -70,12 +76,14 @@ real,dimension(:),allocatable::tm_vol
 real,dimension(:,:),allocatable::tm_windspeed
 real,dimension(:,:),allocatable::tm_T
 real,dimension(:,:),allocatable::tm_S
+real,dimension(:,:),allocatable::tm_silica
 real,dimension(:),allocatable::tm_area
 
 real,dimension(:),allocatable::seaice_dt
 real,dimension(:),allocatable::wind_dt
 real,dimension(:),allocatable::T_dt
 real,dimension(:),allocatable::S_dt
+real,dimension(:),allocatable::silica_dt
 
 real,dimension(:),allocatable::bg_martin_b
 real,dimension(:,:),allocatable::bg_PO4_obs
@@ -90,6 +98,7 @@ real,dimension(:,:),allocatable::particles
 real,dimension(:),allocatable::ATM
 real,dimension(:),allocatable::export
 real,dimension(:,:),allocatable::tracers_PO4_int,tracers_DOP_int,EXPORT_int
+real,dimension(:,:),allocatable::ATM_int
 
 integer,dimension(:),allocatable::iSur
 
@@ -99,8 +108,8 @@ real::gen_conv_d_yr=365.25
 real::bg_DOC_rfrac
 REAL::bg_PO4_init=2.17/1e3 ! initial PO4 (mmol m-3 -> mol m-3) (Kriest et al., 2010)
 REAL::bg_DOC_init=0.0001/1e3 ! inital DOP (mmol m-3 -> mol m-3) (Kriest et al., 2010)
-real::bg_DIC_init=2030/1e3
-real::bg_ALK_init=2030/1e3
+real::bg_DIC_init=2299.0/1e3 !(mmol m-3 -> mol m-3) 
+real::bg_ALK_init=2420.9/1e3 !(mmol m-3 -> mol m-3) 
 real::bg_dt
 integer::ioPO4,ioDOP,ioDIC,ioALK
 integer::ioCO2,ioCO3,ioH
@@ -129,8 +138,9 @@ real,dimension(7,2)::Sol_Orr
 integer::n_ATM_tracers
 real::ATM_vol
 real::ATM_mol
-real::bg_gastransfer_a=251 ! see Orr et al., (2017), eqn. 13
+real::bg_gastransfer_a=6.97e-7 ! see Orr et al., (2017), eqn. 13
 real::rho=1024.5 ! kg m-3
+real::r_rho=1.0/1024.5 ! m3 kg-1
 
 
 

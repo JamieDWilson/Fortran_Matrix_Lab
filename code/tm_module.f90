@@ -135,20 +135,23 @@ allocate(export(tm_nbox))
 allocate(tracers_PO4_int(tm_nbox,n_seasonal))
 allocate(tracers_DOP_int(tm_nbox,n_seasonal))
 allocate(EXPORT_int(tm_nbox,n_seasonal))
+allocate(ATM_int(n_ATM_tracers,n_seasonal))
 
 allocate(iSur(n_euphotic_boxes))
 allocate(tm_seaice_frac(n_euphotic_boxes,n_seasonal))
-allocate(tm_windspeed(n_surface_boxes,n_seasonal))
+allocate(tm_windspeed(n_euphotic_boxes,n_seasonal))
 allocate(tm_area(tm_nbox))
-allocate(tm_T(tm_nbox,n_seasonal))
-allocate(tm_S(tm_nbox,n_seasonal))
+allocate(tm_T(n_euphotic_boxes,n_seasonal))
+allocate(tm_S(n_euphotic_boxes,n_seasonal))
+allocate(tm_silica(n_euphotic_boxes,n_seasonal))
 allocate(bg_PO4_obs(n_euphotic_boxes,n_seasonal))
 allocate(bg_PO4_uptake(n_euphotic_boxes,n_seasonal))
 
 allocate(seaice_dt(n_euphotic_boxes))
 allocate(wind_dt(n_euphotic_boxes))
-allocate(T_dt(tm_nbox))
-allocate(S_dt(tm_nbox))
+allocate(T_dt(n_euphotic_boxes))
+allocate(S_dt(n_euphotic_boxes))
+allocate(silica_dt(n_euphotic_boxes))
 
 
 allocate(tm_vol(tm_nbox))
@@ -186,16 +189,20 @@ Bunsen_coeffs(:,iaCO2)=(/ -60.2409 , 93.4517 , 23.3585 , 0.0023517 , -0.023656 ,
 Sol_Orr(:,iaCO2)=(/-160.7333 , 215.4152 , 89.8920 , -1.47759 , 0.029941 , -0.027455 , 0.0053407 /) ! CO2, Orr et al., 2017, Table 2
 Sol_Orr(:,iaCO2)=Sol_Orr(:,iaCO2)*1000.0 ! mol L-1 atm-1 -> mol m-3 atm-1 (Orr et al., 2017, Table 2)
 
+!Sol_Orr(:,iaCO2)=(/-162.8301 , 218.2968 , 90.9241 , -1.47696 , 0.025695 , -0.025225 , 0.0049867/) ! CO2, Orr et al., 2017, Table 2 as mol kg-1 for checking
+
 ATM_vol=7777.0 * sum(tm_area(1:n_surface_boxes)) ! height (m) * total area (m2)
 ATM_mol=1.77e20 ! 
 
 ! temporary code
 C(:,:)=-1.0
 C_consts(:,:)=0.0
-tm_T(:,:)=20.0
-tm_S(:,:)=34.7
-tm_windspeed(:,:)=0.0
+!tm_T(:,:)=20.0
+!tm_S(:,:)=30.0
+!tm_windspeed(:,:)=0.0
 tm_area=1.0
+ATM(iaCO2)=278.0*1.0e-6
+
 
 
 
@@ -346,7 +353,8 @@ subroutine load_TM_data()
 call load_TM_netcdf('../data'//'/'//trim(tm_data_fileloc)//'/'//trim(tm_Aexp_filename),Aexp)
 call load_TM_netcdf('../data'//'/'//trim(tm_data_fileloc)//'/'//trim(tm_Aimp_filename),Aimp)
 call load_TM_netcdf(tm_Aremin_filename,Aremin)
-call load_seaice()
+!call load_seaice()
+call load_TM_bgc_data()
 call load_PO4_restore()
 call load_volume()
 
@@ -468,6 +476,72 @@ if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
 ! close netcdf file
 status=nf90_close(loc_ncid)
 if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+tm_seaice_frac=1.0-tm_seaice_frac
+
+end subroutine 
+
+! ---------------------------------------------------------------------------------------!
+
+! ---------------------------------------------------------------------------------------!
+
+
+subroutine load_TM_bgc_data()
+
+! local variables
+integer::n,status,loc_varid,loc_ncid
+
+!print*,'Reading in seaice data from:','../data/'//trim(tm_data_fileloc)//'/'//trim(tm_bgc_data_filename)
+
+! open netcdf file
+status=nf90_open('../data/'//trim(tm_data_fileloc)//'/'//trim(tm_bgc_data_filename) , nf90_nowrite,loc_ncid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+! windspeed
+status=nf90_inq_varid(loc_ncid,'windspeed',loc_varid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+status=nf90_get_var(loc_ncid,loc_varid,tm_windspeed,start=(/ 1, 1 /),count=(/ n_euphotic_boxes , 12 /))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+! seaice fraction
+status=nf90_inq_varid(loc_ncid,'Fice',loc_varid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+status=nf90_get_var(loc_ncid,loc_varid,tm_seaice_frac,start=(/ 1, 1 /),count=(/ n_euphotic_boxes , 12 /))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+! T
+status=nf90_inq_varid(loc_ncid,'Tbc',loc_varid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+status=nf90_get_var(loc_ncid,loc_varid,tm_T,start=(/ 1, 1 /),count=(/ n_euphotic_boxes , 12 /))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+! S
+status=nf90_inq_varid(loc_ncid,'Sbc',loc_varid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+status=nf90_get_var(loc_ncid,loc_varid,tm_S,start=(/ 1, 1 /),count=(/ n_euphotic_boxes , 12 /))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+! silica
+status=nf90_inq_varid(loc_ncid,'silica',loc_varid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+status=nf90_get_var(loc_ncid,loc_varid,tm_silica,start=(/ 1, 1 /),count=(/ n_euphotic_boxes , 12 /))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+
+! close netcdf file
+status=nf90_close(loc_ncid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+!print*,tm_seaice_frac(4453:4460,1)
+!print*,tm_windspeed(1:10,1)
+!print*,tm_T(1:10,1)
+!print*,tm_S(1:10,1)
+!print*,tm_silica(1:10,1)
 
 tm_seaice_frac=1.0-tm_seaice_frac
 
@@ -700,7 +774,8 @@ subroutine print_to_screen(dum_t,dum_extra)
 integer::dum_t
 real::dum_extra
 
-print*,'year',dum_t/tm_n_dt,sum(tracers(:,1)*tm_vol),sum(tracers(:,2)*tm_vol),dum_extra
+print*,'year',dum_t/tm_n_dt,sum(tracers(:,ioPO4)*tm_vol),sum(tracers(:,ioDOP)*tm_vol),sum(tracers(:,ioDIC)*tm_vol), &
+ & sum(tracers(:,ioALK)*tm_vol),ATM(iaCO2)*1.0e6,dum_extra
 
 
 
@@ -770,8 +845,6 @@ subroutine tm_vars_at_dt()
 ! tm_seasonal_scale, tm_seasonal_rscale, tm_seasonal_n1, tm_seasonal, n2: from calc_seasonal_scaling
 ! dt_count: fml.f90
 
-!print*,dt_count,tm_seasonal_scale,tm_seasonal_rscale,tm_seasonal_n1,tm_seasonal_n2
-
 seaice_dt=(tm_seasonal_scale(dt_count)*tm_seaice_frac(:,tm_seasonal_n1(dt_count))) &
 + &
 ((tm_seasonal_rscale(dt_count))*tm_seaice_frac(:,tm_seasonal_n2(dt_count)))
@@ -788,11 +861,15 @@ S_dt=(tm_seasonal_scale(dt_count)*tm_S(:,tm_seasonal_n1(dt_count))) &
 + &
 ((tm_seasonal_rscale(dt_count))*tm_S(:,tm_seasonal_n2(dt_count)))
 
+silica_dt=(tm_seasonal_scale(dt_count)*tm_silica(:,tm_seasonal_n1(dt_count))) &
++ &
+((tm_seasonal_rscale(dt_count))*tm_silica(:,tm_seasonal_n2(dt_count)))
+
 ! convert wind_dt to correct units for gas exchange
 ! not pre-calculated due to non-linear terms (u^2)
-! b*(1-seaicefrac)*u^2 from cm/hr -> m/yr
-wind_dt=(wind_dt**2)*bg_gastransfer_a*seaice_dt*0.01*8766.0
-
+! b*(1-seaicefrac)*u^2 from m/s -> m/yr
+!!!! *** windspeed is m/s? so adjust this line of code *** !!!!
+wind_dt=(wind_dt**2)*bg_gastransfer_a*seaice_dt*8766.0
 
 
 end subroutine tm_vars_at_dt
