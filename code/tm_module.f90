@@ -366,7 +366,8 @@ if(bg_PO4restore_select)then
 end if
 
 if(gen_restart_select)then
-	call load_netcdf_restart()
+	!call load_netcdf_restart()
+	call load_restart()
 end if
 
 
@@ -928,6 +929,14 @@ if(exist_dir.eqv..false.)then
 	call system('mkdir ../output/'//trim(gen_config_filename))
 end if
 
+! make restart directory (if doesn't already exist)
+INQUIRE(FILE='../output/'//trim(gen_config_filename)//'/restart', EXIST=exist_dir)
+if(exist_dir.eqv..false.)then
+	call system('mkdir ../output/'//trim(gen_config_filename)//'/restart')
+end if
+
+
+
 ! initialise timeseries files
 call initialise_timeseries_output()
 
@@ -1070,6 +1079,31 @@ end subroutine write_timeseries_output
 
 ! ---------------------------------------------------------------------------------------!
 
+subroutine write_restart()
+
+integer::ios
+
+open(unit=10,form='unformatted',status='replace',action='write',iostat=ios, &
+file='../output/'//trim(gen_config_filename)//'/restart/restart_ocn.rst')
+write(10) tracers_1 , ATM
+close(10,iostat=ios)
+ 
+end subroutine write_restart
+
+! ---------------------------------------------------------------------------------------!
+
+! ---------------------------------------------------------------------------------------!
+
+subroutine load_restart()
+
+integer::ios
+
+open(unit=10,status='old',form='unformatted',action='read',IOSTAT=ios, &
+file='../output/'//trim(gen_restart_filename)//'/restart/restart_ocn.rst')
+read(10,iostat=ios) tracers_1 , ATM
+close(10,iostat=ios)
+
+end subroutine load_restart
 
 ! ---------------------------------------------------------------------------------------!
 
