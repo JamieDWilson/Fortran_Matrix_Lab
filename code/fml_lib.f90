@@ -48,6 +48,9 @@ integer::gen_n_tracers
 namelist / tm_namelist / gen_n_tracers
 integer::gen_runtime_years
 namelist / tm_namelist / gen_runtime_years
+character(len=100)::gen_save_timeseries_file
+namelist /tm_namelist/ gen_save_timeseries_file
+
 
 ! end of namelist definitions
 
@@ -97,10 +100,12 @@ real,dimension(:,:),allocatable::J
 real,dimension(:,:),allocatable::particles
 real,dimension(:),allocatable::ATM
 real,dimension(:),allocatable::export
-real,dimension(:,:),allocatable::tracers_PO4_int,tracers_DOP_int,EXPORT_int
-real,dimension(:,:),allocatable::ATM_int
+real,dimension(:,:),allocatable::tracers_int,EXPORT_int
+real,dimension(:),allocatable::ATM_int
+real::t_int=0.0
 
 integer,dimension(:),allocatable::iSur
+real,dimension(:),allocatable::tm_timeseries
 
 
 ! ******************* global variables ***********************!
@@ -147,6 +152,8 @@ real::r_rho=1.0/1024.5 ! m3 kg-1
 
 real::carbchem_tol=0.01 ! tolerance for H+ convergence
 
+real::tm_save_intra_freq=1.0
+integer::timeseries_count=1
 
 contains
 ! ---------------------------------------------------------------------------------------!

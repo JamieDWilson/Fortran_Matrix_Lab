@@ -150,24 +150,6 @@ end subroutine update_bgc
 
 ! ---------------------------------------------------------------------------------------!
 
-subroutine integrate_output(save_count)
-
-integer,intent(inOUT)::save_count
-
-tracers_PO4_int(:,save_count)=tracers_PO4_int(:,save_count)+tracers(:,ioPO4)*tm_dt*n_seasonal
-tracers_DOP_int(:,save_count)=tracers_DOP_int(:,save_count)+tracers(:,ioDOP)*tm_dt*n_seasonal
-EXPORT_int(:,save_count)=EXPORT_int(:,save_count)+export(:)*tm_dt*n_seasonal
-
-if(mod(dt_count,tm_n_dt/n_seasonal).eq.0 .and. tm_seasonal)then
-	save_count=save_count+1
-end if
-
-end subroutine integrate_output
-
-! ---------------------------------------------------------------------------------------!
-
-! ---------------------------------------------------------------------------------------!
-
 subroutine calc_C_consts()
 
 ! calculate carbonate system constants

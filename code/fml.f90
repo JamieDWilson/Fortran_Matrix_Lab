@@ -17,8 +17,7 @@ call initialise_model()
 call setup_model()
 ! load transport matrix data
 call load_TM_data()
-!tm_T(:,:)=25.0
-!tm_S(:,:)=35.0
+
 
 print*,'*************************'
 print*,'Running model...'
@@ -67,13 +66,8 @@ do t=1,gen_runtime_years*tm_n_dt
 		
  	end if
  	call cpu_time(finish2)
-	
-	! integrate output in last year of run
-	if(t.gt.((gen_runtime_years*tm_n_dt)-tm_n_dt))then
 		
-		call integrate_output(save_count)
-
-	end if
+	call integrate_output(t,save_count)
 	
 	if(mod(t,tm_n_dt)==0.0)then
 		call print_to_screen(t,finish2-start2)

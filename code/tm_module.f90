@@ -62,6 +62,7 @@ print*,
 
 ! create indices for calculating seasonal TMs
 call calc_seasonal_scaling()
+call load_data_saving()
 
 ! convert parameters to correct units
 tm_dt=1.0/tm_n_dt ! TMM timestep
@@ -104,9 +105,9 @@ iopCO2=4
 iaO2=1
 iaCO2=2
 
-n_ATM_tracers=0
-if(bg_O_select) n_ATM_tracers=n_ATM_tracers+1
-IF(bg_C_select) n_ATM_tracers=n_ATM_tracers+1
+n_ATM_tracers=2 ! n.b. 1 does not allow array operations
+!if(bg_O_select) n_ATM_tracers=n_ATM_tracers+1
+!IF(bg_C_select) n_ATM_tracers=n_ATM_tracers+1
 
 ! set-up sparse matrices
 Aexp%nnz=tm_Aexp_nnz
@@ -133,10 +134,9 @@ allocate(ATM(n_ATM_tracers))
 allocate(J(tm_nbox,gen_n_tracers))
 allocate(particles(tm_nbox,gen_n_tracers))
 allocate(export(tm_nbox))
-allocate(tracers_PO4_int(tm_nbox,n_seasonal))
-allocate(tracers_DOP_int(tm_nbox,n_seasonal))
+allocate(tracers_int(tm_nbox,gen_n_tracers))
 allocate(EXPORT_int(tm_nbox,n_seasonal))
-allocate(ATM_int(n_ATM_tracers,n_seasonal))
+allocate(ATM_int(n_ATM_tracers))
 
 allocate(iSur(n_euphotic_boxes))
 allocate(tm_seaice_frac(n_euphotic_boxes,n_seasonal))
@@ -173,8 +173,8 @@ else
 	end if
 tracers(:,:)=0.0
 J(:,:)=0.0
-tracers_PO4_int(:,:)=0.0
-tracers_DOP_int(:,:)=0.0
+tracers_int(:,:)=0.0
+ATM_int(:)=0.0
 EXPORT_int(:,:)=0.0
 dt_count=1 ! keep track of how many timesteps have passed in one year
 
@@ -204,7 +204,7 @@ C_consts(:,:)=0.0
 tm_area=1.0
 ATM(iaCO2)=278.0*1.0e-6
 
-
+call initialise_output()
 
 
 end subroutine setup_model
@@ -610,6 +610,45 @@ end subroutine
 
 ! ---------------------------------------------------------------------------------------!
 
+
+subroutine load_data_saving()
+
+! local variables
+integer::var_count,n
+integer::iostat
+logical::exist_file
+real::tmp
+
+! open, read file for dimension, and allocate
+INQUIRE(FILE='../data/'//trim(gen_save_timeseries_file), EXIST=exist_file)
+if(exist_file.eqv..false.) print*,'Timeseries input file does not exist'
+
+open(UNIT=10,FILE='../data/'//trim(gen_save_timeseries_file))
+var_count=0
+DO
+	READ(UNIT=10,IOSTAT=iostat,FMT=*)  tmp
+	IF (iostat < 0) THEN
+       exit
+    ELSE
+       var_count=var_count+1
+    END IF
+END DO
+close(UNIT=10)
+allocate(tm_timeseries(var_count))
+
+! read in timeseries save points
+open(UNIT=10,FILE='../data/'//trim(gen_save_timeseries_file))
+read(unit=10,iostat=iostat,fmt='(F10.1)') tm_timeseries
+close(unit=10)
+
+
+
+end subroutine 
+
+! ---------------------------------------------------------------------------------------!
+
+! ---------------------------------------------------------------------------------------!
+
 subroutine load_volume()
 
 ! local variables
@@ -793,46 +832,46 @@ integer::ncid,status,m_dimid,n_dimid,PO4id,DOPid,EXPORTid,n_season
 integer::dimids(gen_n_tracers)
 
 ! create file
-status=nf90_create('../output/'//trim(gen_config_filename)//'.nc',nf90_clobber,ncid)
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
-
+! status=nf90_create('../output/'//trim(gen_config_filename)//'.nc',nf90_clobber,ncid)
+! if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+! 
 ! define dimensions
-status=nf90_def_dim(ncid,'tm_nbox',tm_nbox,m_dimid)
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
-
-status=nf90_def_dim(ncid,'time',n_seasonal,n_dimid)
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
-
-dimids=(/m_dimid,n_dimid/)
-
+! status=nf90_def_dim(ncid,'tm_nbox',tm_nbox,m_dimid)
+! if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+! 
+! status=nf90_def_dim(ncid,'time',n_seasonal,n_dimid)
+! if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+! 
+! dimids=(/m_dimid,n_dimid/)
+! 
 ! define variable
-status=nf90_def_var(ncid,'PO4',nf90_float,dimids,PO4id)
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
-
-status=nf90_def_var(ncid,'DOP',nf90_float,dimids,DOPid)
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
-
-status=nf90_def_var(ncid,'EXPORT',nf90_float,dimids,EXPORTid)
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
-
+! status=nf90_def_var(ncid,'PO4',nf90_float,dimids,PO4id)
+! if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+! 
+! status=nf90_def_var(ncid,'DOP',nf90_float,dimids,DOPid)
+! if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+! 
+! status=nf90_def_var(ncid,'EXPORT',nf90_float,dimids,EXPORTid)
+! if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+! 
 ! end definition
-status=nf90_enddef(ncid)
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
-
+! status=nf90_enddef(ncid)
+! if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+! 
 ! write data
-status=nf90_put_var(ncid,PO4id,tracers_PO4_int(:,:))
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
-
-status=nf90_put_var(ncid,DOPid,tracers_DOP_int(:,:))
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
-
-status=nf90_put_var(ncid,EXPORTid,EXPORT_int(:,:))
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
-
-status=nf90_close(ncid)
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
-
-print*,'Output written to: ','../output/'//trim(gen_config_filename)//'.nc'
+! status=nf90_put_var(ncid,PO4id,tracers_PO4_int(:,:))
+! if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+! 
+! status=nf90_put_var(ncid,DOPid,tracers_DOP_int(:,:))
+! if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+! 
+! status=nf90_put_var(ncid,EXPORTid,EXPORT_int(:,:))
+! if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+! 
+! status=nf90_close(ncid)
+! if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+! 
+! print*,'Output written to: ','../output/'//trim(gen_config_filename)//'.nc'
 
 end subroutine write_output_netcdf
 
@@ -868,9 +907,7 @@ silica_dt=(tm_seasonal_scale(dt_count)*tm_silica(:,tm_seasonal_n1(dt_count))) &
 
 ! convert wind_dt to correct units for gas exchange
 ! not pre-calculated due to non-linear terms (u^2)
-! b*(1-seaicefrac)*u^2 from m/s -> m/yr
 !!!! *** windspeed is m/s? so adjust this line of code *** !!!!
-!wind_dt=(wind_dt**2)*bg_gastransfer_a*seaice_dt*8766.0
 wind_dt=(wind_dt**2)*bg_gastransfer_a*seaice_dt*conv_sec_yr
 
 
@@ -879,5 +916,164 @@ end subroutine tm_vars_at_dt
 ! ---------------------------------------------------------------------------------------!
 
 ! ---------------------------------------------------------------------------------------!
+
+
+subroutine initialise_output()
+
+logical::exist_dir
+
+! make output directory (if doesn't already exist)
+INQUIRE(FILE='../output/'//trim(gen_config_filename), EXIST=exist_dir)
+if(exist_dir.eqv..false.)then
+	call system('mkdir ../output/'//trim(gen_config_filename))
+end if
+
+! initialise timeseries files
+call initialise_timeseries_output()
+
+end subroutine initialise_output
+
+! ---------------------------------------------------------------------------------------!
+
+! ---------------------------------------------------------------------------------------!
+
+
+subroutine initialise_timeseries_output()
+
+! atm CO2
+open(unit=10,file='../output/'//trim(gen_config_filename)//'/timeseries_atm_CO2.dat',status='replace')
+write(unit=10,fmt='(A44)') '% / year / atmospheric CO2 (ppmv)' 
+close(unit=10)
+
+! PO4
+open(unit=10,file='../output/'//trim(gen_config_filename)//'/timeseries_ocn_PO4.dat',status='replace')
+write(unit=10,fmt='(A100)') '% / year / PO4 inventory (mol) / [PO4] global (mmol m-3)' 
+close(unit=10)
+
+! DOP
+open(unit=10,file='../output/'//trim(gen_config_filename)//'/timeseries_ocn_DOP.dat',status='replace')
+write(unit=10,fmt='(A100)') '% / year / DOP inventory (mol) / [DOP] global (mmol m-3)' 
+close(unit=10)
+
+! DIC
+open(unit=10,file='../output/'//trim(gen_config_filename)//'/timeseries_ocn_DIC.dat',status='replace')
+write(unit=10,fmt='(A100)') '% / year / DIC inventory (mol) / [DIC] global (mmol m-3)' 
+close(unit=10)
+
+! ALK
+open(unit=10,file='../output/'//trim(gen_config_filename)//'/timeseries_ocn_ALK.dat',status='replace')
+write(unit=10,fmt='(A100)') '% / year / ALK inventory (mol) / [ALK] global (mmol m-3)' 
+close(unit=10)
+
+
+
+end subroutine initialise_timeseries_output
+
+! ---------------------------------------------------------------------------------------!
+
+! ---------------------------------------------------------------------------------------!
+
+
+subroutine integrate_output(loc_t,save_count)
+
+integer,intent(inOUT)::save_count
+integer,intent(in)::loc_t
+real::scalar
+
+
+
+!tracers_PO4_int(:,save_count)=tracers_PO4_int(:,save_count)+tracers(:,ioPO4)*tm_dt*n_seasonal
+!tracers_DOP_int(:,save_count)=tracers_DOP_int(:,save_count)+tracers(:,ioDOP)*tm_dt*n_seasonal
+!EXPORT_int(:,save_count)=EXPORT_int(:,save_count)+export(:)*tm_dt*n_seasonal
+
+!if(mod(dt_count,tm_n_dt/n_seasonal).eq.0 .and. tm_seasonal)then
+!	save_count=save_count+1
+!end if
+
+if(loc_t>=tm_timeseries(timeseries_count)*96-47 .and. loc_t<=tm_timeseries(timeseries_count)*96+48)then
+
+	! integrate 
+	scalar=bg_dt*tm_save_intra_freq
+	tracers_int(:,:)=tracers_int(:,:)+tracers(:,:)*scalar
+	ATM_int(:)=ATM_int(:)+ATM(:)*scalar
+	t_int=t_int+((loc_t-1.0)/(1.0/bg_dt))*scalar
+
+	! write when reached end of time period
+	! and reset integrating arrays
+	if(loc_t==tm_timeseries(timeseries_count)*96+48)then
+		call write_timeseries_output()
+		timeseries_count=timeseries_count+1
+		ATM_int(:)=0.0
+		tracers_int(:,:)=0.0
+		t_int=0.0
+	endif
+		
+	
+endif
+
+end subroutine integrate_output
+
+! ---------------------------------------------------------------------------------------!
+
+! ---------------------------------------------------------------------------------------!
+
+
+subroutine write_timeseries_output()
+
+real::rvol_tot
+
+rvol_tot=1.0/sum(tm_vol)
+
+! CO2
+open(unit=10,file='../output/'//trim(gen_config_filename)//'/timeseries_atm_CO2.dat',position='append')
+write(unit=10,fmt='(f12.1,f12.6)') &
+t_int , &
+ATM_int(iaCO2)*1.0e6
+close(unit=10)
+
+!PO4
+open(unit=10,file='../output/'//trim(gen_config_filename)//'/timeseries_ocn_PO4.dat',position='append')
+write(unit=10,fmt='(f12.1,e20.12,f12.6)') &
+t_int , &
+sum(tracers_int(:,ioPO4)*tm_vol) , &
+sum(tracers_int(:,ioPO4)*tm_vol)*rvol_tot*1.0e3
+close(unit=10)
+
+!DOP
+open(unit=10,file='../output/'//trim(gen_config_filename)//'/timeseries_ocn_DOP.dat',position='append')
+write(unit=10,fmt='(f12.1,e20.12,f12.6)') &
+t_int , &
+sum(tracers_int(:,ioDOP)*tm_vol) , &
+sum(tracers_int(:,ioDOP)*tm_vol)*rvol_tot*1.0e3
+close(unit=10)
+
+!DIC
+open(unit=10,file='../output/'//trim(gen_config_filename)//'/timeseries_ocn_DIC.dat',position='append')
+write(unit=10,fmt='(f12.1,e20.12,f12.6)') &
+t_int , &
+sum(tracers_int(:,ioDIC)*tm_vol) , &
+sum(tracers_int(:,ioDIC)*tm_vol)*rvol_tot*1.0e3
+close(unit=10)
+
+!ALK
+open(unit=10,file='../output/'//trim(gen_config_filename)//'/timeseries_ocn_ALK.dat',position='append')
+write(unit=10,fmt='(f12.1,e20.12,f12.6)') &
+t_int , &
+sum(tracers_int(:,ioALK)*tm_vol) , &
+sum(tracers_int(:,ioALK)*tm_vol)*rvol_tot*1.0e3
+close(unit=10)
+
+
+end subroutine write_timeseries_output
+
+! ---------------------------------------------------------------------------------------!
+
+! ---------------------------------------------------------------------------------------!
+
+
+! ---------------------------------------------------------------------------------------!
+
+! ---------------------------------------------------------------------------------------!
+
 
 end module tm_module
