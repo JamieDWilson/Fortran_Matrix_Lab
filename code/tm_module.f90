@@ -99,6 +99,7 @@ iKp3=9
 ioCO2=1
 ioCO3=2
 ioH=3
+iopCO2=4
 
 iaO2=1
 iaCO2=2
@@ -187,7 +188,7 @@ Bunsen_coeffs(:,iaO2)=(/-58.3877 , 85.8079 , 23.8439 , -0.034892 , 0.015568 , -0
 Bunsen_coeffs(:,iaCO2)=(/ -60.2409 , 93.4517 , 23.3585 , 0.0023517 , -0.023656 , 0.0047036 /) ! CO2
 
 Sol_Orr(:,iaCO2)=(/-160.7333 , 215.4152 , 89.8920 , -1.47759 , 0.029941 , -0.027455 , 0.0053407 /) ! CO2, Orr et al., 2017, Table 2
-Sol_Orr(:,iaCO2)=Sol_Orr(:,iaCO2)*1000.0 ! mol L-1 atm-1 -> mol m-3 atm-1 (Orr et al., 2017, Table 2)
+!Sol_Orr(:,iaCO2)=Sol_Orr(:,iaCO2)*1000.0 ! mol L-1 atm-1 -> mol m-3 atm-1 (Orr et al., 2017, Table 2)
 
 !Sol_Orr(:,iaCO2)=(/-162.8301 , 218.2968 , 90.9241 , -1.47696 , 0.025695 , -0.025225 , 0.0049867/) ! CO2, Orr et al., 2017, Table 2 as mol kg-1 for checking
 
@@ -869,7 +870,8 @@ silica_dt=(tm_seasonal_scale(dt_count)*tm_silica(:,tm_seasonal_n1(dt_count))) &
 ! not pre-calculated due to non-linear terms (u^2)
 ! b*(1-seaicefrac)*u^2 from m/s -> m/yr
 !!!! *** windspeed is m/s? so adjust this line of code *** !!!!
-wind_dt=(wind_dt**2)*bg_gastransfer_a*seaice_dt*8766.0
+!wind_dt=(wind_dt**2)*bg_gastransfer_a*seaice_dt*8766.0
+wind_dt=(wind_dt**2)*bg_gastransfer_a*seaice_dt*conv_sec_yr
 
 
 end subroutine tm_vars_at_dt

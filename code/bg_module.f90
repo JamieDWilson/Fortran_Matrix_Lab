@@ -127,15 +127,21 @@ end subroutine POP_remin
 ! ---------------------------------------------------------------------------------------!
 
 subroutine update_bgc()
-integer::n 
+integer::n,n_tracer 
 
-		do n=1,tm_nbox
-			tracers(n,1)=tracers(n,1)+J(n,1)*bg_dt
-		end do
-		
-		do n=1,tm_nbox
-			tracers(n,2)=tracers(n,2)+J(n,2)*bg_dt
-		end do
+do n_tracer=1,gen_n_tracers
+	do n=1,tm_nbox
+		tracers(n,n_tracer)=tracers(n,n_tracer)+J(n,n_tracer)*bg_dt
+	enddo
+enddo
+
+		!do n=1,tm_nbox
+	!		tracers(n,1)=tracers(n,1)+J(n,1)*bg_dt
+	!	end do
+	!	
+	!	do n=1,tm_nbox
+	!		tracers(n,2)=tracers(n,2)+J(n,2)*bg_dt
+	!	end do
 			
 
 end subroutine update_bgc
@@ -239,15 +245,15 @@ enddo
 ! compare with DOE (1994)
 !print*,'T',T
 !print*,'S',S
-!print*,'K1',log(C_consts(1,iK1))
-!print*,'K2',log(C_consts(1,iK2))
-!print*,'K0',log(C_consts(1,iK0))
-!print*,'Kw',log(C_consts(1,iKw))
-!print*,'KB',log(C_consts(1,iKB))
-!print*,'KSi',log(C_consts(1,iKSi))
-!print*,'Kp1',log(C_consts(1,iKp1))
-!print*,'Kp2',log(C_consts(1,iKp2))
-!print*,'Kp3',log(C_consts(1,iKp3))
+!print*,'K1',log(C_consts(1,iK1)),(C_consts(1,iK1))
+!print*,'K2',log(C_consts(1,iK2)),(C_consts(1,iK2))
+!print*,'K0',log(C_consts(1,iK0)),(C_consts(1,iK0))
+!print*,'Kw',log(C_consts(1,iKw)),(C_consts(1,iKw))
+!print*,'KB',log(C_consts(1,iKB)),(C_consts(1,iKB))
+!print*,'KSi',log(C_consts(1,iKSi)),(C_consts(1,iKSi))
+!print*,'Kp1',log(C_consts(1,iKp1)),(C_consts(1,iKp1))
+!print*,'Kp2',log(C_consts(1,iKp2)),(C_consts(1,iKp2))
+!print*,'Kp3',log(C_consts(1,iKp3)),(C_consts(1,iKp3))
 
 end subroutine calc_C_consts
 
@@ -264,7 +270,8 @@ subroutine calc_pCO2()
 ! local variables
 real::pt,sit,ta,pCO2,dic,H,bt,k1,k2,k1p,k2p,k3p,kb,kw,ksi,k0 ! ff in original but not used, added k0
 real::gamm,co2s,hg,cag,bohg,h3po4g,h2po4g,hpo4g,po4g,siooh3g,denom,dummy,fg
-integer::n
+integer::n,n_loop
+real::h_guess_1,h_guess_2
 
 ! dic = dissolved inorganic carbon; pt = dissolved inorganic phosphorus
 ! sit = dissolved inorganic silica, bt = dissolved inorganic boron
@@ -298,31 +305,64 @@ k0=C_consts(n,iK0)
 ! First guess of [H+]: from last timestep *OR* fixed for cold start
 
 if(C(n,ioH).eq.-1.0)then
-	hg=1.0e-9 ! cold start
+	hg=10e-8 ! cold start 
+	h_guess_1=1.0
+	h_guess_2=hg
 	else
 	hg=C(n,ioH) ! previous timestep
+	h_guess_1=1.0
+	h_guess_2=hg
 endif
+
+
+n_loop=0
+do while (abs(h_guess_1-h_guess_2)>carbchem_tol)
 
 ! estimate contributions to total alk from borate, silicate, phosphate
 bohg = bt*kb/(hg + kb)
+
 siooh3g = sit*ksi/(ksi + hg)
+
 denom = hg*hg*hg + (k1p*hg*hg) + (k1p*k2p*hg) + (k1p*k2p*k3p)
+
 h3po4g = (pt*hg*hg*hg)/denom
+
 h2po4g = (pt*k1p*hg*hg)/denom
+
 hpo4g = (pt*k1p*k2p*hg)/denom
+
 po4g = (pt*k1p*k2p*k3p)/denom
+
 ! estimate carbonate alkalinity
 fg = - bohg - (kw/hg) + hg - hpo4g - 2.0*po4g + h3po4g - siooh3g
+
 cag = ta + fg
+
 ! improved estimate of hydrogen ion conc
 gamm = dic/cag
+
 dummy = (1.0-gamm)*(1.0-gamm)*k1*k1 - 4.0*k1*k2*(1.0 - 2.0*gamm)
+
 H = 0.5*((gamm-1.0)*k1 + sqrt(dummy))
+
+hg=H
+h_guess_1=h_guess_2
+h_guess_2=hg
+n_loop=n_loop+1
+if(n_loop.eq.10) exit ! get-out clause
+
+end do
+
 ! evaluate [CO2*]
 co2s = dic/(1.0 + (k1/H) + (k1*k2/(H*H)))
-! evaluate surface pCO2
+!evaluate surface pCO2
+pco2=dic/k0*((1.0+k1/H+(k1*k2)/(H*H))**(-1.0))
 C(n,ioCO2) = co2s*rho ! mol kg-1 -> mol m-3
 C(n,ioH) = H
+C(n,iopCO2) = pco2
+
+!print*,C(n,ioCO2),co2s,T_dt(n)+273.15,S_dt(n),dic,ta,pt,sit,bt,hg,H
+!STOP
 
 enddo
 
@@ -336,7 +376,7 @@ subroutine calc_gasexchange()
 
 real::loc_T,loc_T2,loc_T3,loc_T4,loc_Tr100,loc_T100_2,loc_TK,loc_S,loc_T100
 REAL::Sc,Bunsen,Sol,gasex
-real::kw,F_o2a,F_a2o
+real::kw,CO2star,CO2starair
 real,dimension(n_ATM_tracers)::atm_dt
 integer::n
 
@@ -400,7 +440,8 @@ do n=1,n_surface_boxes
 		+loc_S* &
 		(Sol_Orr(5,iaCO2) &
 		+Sol_Orr(6,iaCO2)*loc_T100 &
-		+Sol_Orr(7,iaCO2)*loc_T100_2)) ! mol m-3 atm-1
+		+Sol_Orr(7,iaCO2)*loc_T100_2)) ! mol L-3 atm-1
+		Sol=Sol*0.001 ! mol L-1 atm-1 -> mol m-3 atm-1
 		
 		!print*,Sol_Orr(1,iaCO2),Sol_Orr(2,iaCO2),Sol_Orr(3,iaCO2),Sol_Orr(4,iaCO2), &
 		!& Sol_Orr(5,iaCO2),Sol_Orr(6,iaCO2),Sol_Orr(7,iaCO2)
@@ -408,21 +449,21 @@ do n=1,n_surface_boxes
 		
 		!Bunsen=Bunsen*1024.5*1.03-6 ! mol/(kg*atm) -> mol/(m3*uatm) 
 		
-		kw=wind_dt(n)*((Sc/660.0)**(-0.5)) ! m yr-1
+		kw=wind_dt(n)*((Sc/660.0)**(-0.5)) ! in m yr-1 (conversion factors and parameter a computed in wind_dt)
 		
-		F_a2o=Sol*ATM(iaCO2) ! [CO2*]sat (mol m-3)
+		CO2starair=Sol*ATM(iaCO2) ! [CO2*]sat (mol m-3)
 		!F_a2o=piston*ATM(iaCO2)*Bunsen
 		
-		F_o2a=C(n,ioCO2) ! [CO2*] (mol m-3)
+		CO2star=C(n,ioCO2) ! [CO2*] (mol m-3)
 		
-		gasex=kw*(F_a2o-F_o2a)*50.0 ! mol m-3 yr-1 (n.b. hard coded depth in m)
+		gasex=kw*(CO2starair-CO2star)*(1./50.0) ! mol m-3 yr-1 (n.b. hard coded depth in m!!)
 		
-		!print*,ATM(iaCO2),C(n,ioCO2),kw,gasex,Sol,Sc,loc_T,loc_S
+		!print*,ATM(iaCO2),C(n,ioCO2),kw,CO2star,CO2starair,Sol,gasex,loc_T,loc_S
 		!STOP
 				
 		J(n,ioDIC)=J(n,ioDIC)+gasex ! update ocean source/sink
 		
-		ATM(iaCO2)=ATM(iaCO2)-gasex*tm_vol(n)/ATM_mol*bg_dt ! update atmosphere 
+		ATM(iaCO2)=ATM(iaCO2)-(gasex*bg_dt*tm_vol(n))/ATM_mol ! update atmosphere 
 		
 		
 	endif

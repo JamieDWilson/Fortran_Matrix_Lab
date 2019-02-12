@@ -112,7 +112,7 @@ real::bg_DIC_init=2299.0/1e3 !(mmol m-3 -> mol m-3)
 real::bg_ALK_init=2420.9/1e3 !(mmol m-3 -> mol m-3) 
 real::bg_dt
 integer::ioPO4,ioDOP,ioDIC,ioALK
-integer::ioCO2,ioCO3,ioH
+integer::ioCO2,ioCO3,ioH,iopCO2
 integer::iK1,iK2,iKw,iKp1,iKp2,iKp3,iKSi,iKb,iK0
 integer::iaO2,iaCO2
 
@@ -135,13 +135,17 @@ real,dimension(5,2)::Sc_coeffs ! 4 if using older values
 real,dimension(6,2)::Bunsen_coeffs
 real,dimension(7,2)::Sol_Orr 
 
+real::conv_sec_yr=60.0*60.0*24.0*365.25
+
 integer::n_ATM_tracers
 real::ATM_vol
 real::ATM_mol
 real::bg_gastransfer_a=6.97e-7 ! see Orr et al., (2017), eqn. 13
+!real::bg_gastransfer_a=0.251
 real::rho=1024.5 ! kg m-3
 real::r_rho=1.0/1024.5 ! m3 kg-1
 
+real::carbchem_tol=0.01 ! tolerance for H+ convergence
 
 
 contains
