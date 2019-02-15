@@ -161,7 +161,7 @@ contains
 ! ---------------------------------------------------------------------------------------!
 
 ! ---------------------------------------------------------------------------------------!
-subroutine initialise_model()
+subroutine load_namelist()
 
 ! local variables
 integer::ios,nn,n,i
@@ -187,7 +187,7 @@ open(unit=20,file='../experiments/'//trim(gen_config_filename),status='old',acti
 read(unit=20,nml=tm_namelist,iostat=ios)
 close(unit=20)
 
-end subroutine initialise_model
+end subroutine load_namelist
 
 ! ---------------------------------------------------------------------------------------!
 

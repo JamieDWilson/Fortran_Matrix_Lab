@@ -3,6 +3,7 @@ PROGRAM fml
 use fml_lib
 use tm_module
 use bg_module
+use io_module
 
 implicit none
 
@@ -11,16 +12,13 @@ integer::n,nn,t,p,count,save_count
 real::start,finish,sum_val,start2,finish2
 count=0
 save_count=1
-! initialise parameters and arrays
-call initialise_model()
+
+! load user parameters
+call load_namelist()
 ! allocate arrays, assign parameter values
-call setup_model()
-! load transport matrix data
-call load_TM_data()
+call initialise_model()
 
 
-print*,'*************************'
-print*,'Running model...'
 ! run simulation
 call cpu_time(start)
 
