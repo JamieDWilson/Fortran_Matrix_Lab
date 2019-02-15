@@ -88,7 +88,7 @@ print*,
 
 ! write output to netcdf file
 print*,'*************************'
-!call write_output_netcdf()
+call write_output_netcdf()
 call write_restart()
 print*,'*************************'
 

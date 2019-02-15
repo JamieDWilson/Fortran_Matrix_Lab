@@ -77,7 +77,7 @@ do n=1,tm_nbox
 
 	if(tracers_1(n,ioDOP).gt.1e-8)then ! Kriest et al., (2010) . Also smaller concentrations slow down the matrix calculation significantly.
 		remin=tracers_1(n,ioDOP)*bg_DOC_k
-		
+
 		if(remin*bg_dt.lt.tracers_1(n,ioDOP))then ! catch remineralisation making DOP go negative
 			J(n,ioPO4)=J(n,ioPO4)+remin ! DOP remin -> PO4
 			J(n,ioDOP)=J(n,ioDOP)-remin ! DOP remin <- DOP
@@ -447,6 +447,8 @@ do n=1,n_surface_boxes
 		
 		ATM(iaCO2)=ATM(iaCO2)-(gasex*bg_dt*tm_vol(n))/ATM_mol ! update atmosphere 
 		
+		diag(n,2)=gasex*tm_vol(n) ! mol yr-1
+		diag(n,1)=gasex*50.0 ! mol m-2 yr-1
 		
 	endif
 		

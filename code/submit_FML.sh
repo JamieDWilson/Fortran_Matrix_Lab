@@ -1,7 +1,7 @@
 #!/bin/bash -e
 
 
-RUNPATH=$HOME/scripts/TMM_model/code
+RUNPATH=$HOME/scripts/Fortran_Matrix_Lab/code
 cd $RUNPATH
 
 

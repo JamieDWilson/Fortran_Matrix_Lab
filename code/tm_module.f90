@@ -137,11 +137,20 @@ allocate(export(tm_nbox))
 allocate(tracers_int(tm_nbox,gen_n_tracers))
 allocate(EXPORT_int(tm_nbox,n_seasonal))
 allocate(ATM_int(n_ATM_tracers))
+allocate(diag(tm_nbox,2)) ! n.b. second dimension hard-coded currently
+allocate(diag_int(tm_nbox,2)) ! n.b. second dimension hard-coded currently
 
 allocate(iSur(n_euphotic_boxes))
 allocate(tm_seaice_frac(n_euphotic_boxes,n_seasonal))
 allocate(tm_windspeed(n_euphotic_boxes,n_seasonal))
 allocate(tm_area(tm_nbox))
+allocate(tm_vol(tm_nbox))
+allocate(tm_i(tm_nbox))
+allocate(tm_j(tm_nbox))
+allocate(tm_k(tm_nbox))
+allocate(tm_lon(tm_nbox))
+allocate(tm_lat(tm_nbox))
+allocate(tm_depth(tm_nbox))
 allocate(tm_T(n_euphotic_boxes,n_seasonal))
 allocate(tm_S(n_euphotic_boxes,n_seasonal))
 allocate(tm_silica(n_euphotic_boxes,n_seasonal))
@@ -155,7 +164,6 @@ allocate(S_dt(n_euphotic_boxes))
 allocate(silica_dt(n_euphotic_boxes))
 
 
-allocate(tm_vol(tm_nbox))
 
 ! surface indices (are the first 4448 entries to the vector)
 do n=1,n_euphotic_boxes
@@ -176,6 +184,7 @@ J(:,:)=0.0
 tracers_int(:,:)=0.0
 ATM_int(:)=0.0
 EXPORT_int(:,:)=0.0
+diag_int(:,:)=0.0
 dt_count=1 ! keep track of how many timesteps have passed in one year
 
 !Sc_coeffs(:,iaO2)=(/1953.4 , 128.00 , 3.9918 , 0.050091/)   ! O2
@@ -350,14 +359,15 @@ end subroutine calc_seasonal_scaling
 subroutine load_TM_data()
 
 ! load data from files
-
+print*,'../data'//'/'//trim(tm_data_fileloc)//'/'//trim(tm_Aexp_filename)
 call load_TM_netcdf('../data'//'/'//trim(tm_data_fileloc)//'/'//trim(tm_Aexp_filename),Aexp)
 call load_TM_netcdf('../data'//'/'//trim(tm_data_fileloc)//'/'//trim(tm_Aimp_filename),Aimp)
 call load_TM_netcdf(tm_Aremin_filename,Aremin)
-!call load_seaice()
+
+call load_TM_grid_data()
 call load_TM_bgc_data()
-call load_PO4_restore()
-call load_volume()
+
+
 
 if(bg_PO4restore_select)then
 	call load_PO4_restore()
@@ -404,44 +414,45 @@ end subroutine
 
 SUBROUTINE load_TM_netcdf(dum_filename,dum_A)
 
-character(len=100),intent(in)::dum_filename
+character(len=*)::dum_filename
 type(sparse)::dum_A
 
 integer::loc_ncid,loc_varid,status
 character(len=100)::loc_lname
 
 !print*,'loading TM data from:','OMFG/data/'//trim(tm_data_fileloc)//'/'//trim(dum_filename)
-!print*,'loading TM data from:',dum_filename
+print*,'loading TM data from:',trim(dum_filename)
 
 ! open netcdf file
 !status=nf90_open('../data/'//trim(tm_data_fileloc)//'/'//trim(dum_filename) , nf90_nowrite,loc_ncid)
-status=nf90_open('../data/'//'/'//dum_filename , nf90_nowrite,loc_ncid)
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+!status=nf90_open('../data/'//'/'//trim(dum_filename),nf90_nowrite,loc_ncid)
+status=nf90_open(trim(dum_filename),nf90_nowrite,loc_ncid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),dum_filename
 !print*,dum_filename
 ! matrix values
 status=nf90_inq_varid(loc_ncid,'A_val',loc_varid)
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),'A_val'
 
 status=nf90_get_var(loc_ncid,loc_varid,dum_A%val)
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),'A_val'
 !print*,dum_A%val(1:20,1)
 !print*,dum_A%val(1:10,12)
 
 
 ! matrix column indices
 status=nf90_inq_varid(loc_ncid,'A_col',loc_varid)
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),'A_col'
 
 status=nf90_get_var(loc_ncid,loc_varid,dum_A%col)
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),'A_col'
 !print*,dum_A%col(1:20)
 
 ! matrix row pointer indices
 STATUS=nf90_inq_varid(loc_ncid,'A_row',loc_varid)
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),'A_row'
 
 status=nf90_get_var(loc_ncid,loc_varid,dum_A%row)
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),'A_row'
 !print*,dum_A%row(1:20)
 
 ! close netcdf file
@@ -497,42 +508,42 @@ integer::n,status,loc_varid,loc_ncid
 
 ! open netcdf file
 status=nf90_open('../data/'//trim(tm_data_fileloc)//'/'//trim(tm_bgc_data_filename) , nf90_nowrite,loc_ncid)
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))//'->'//tm_bgc_data_filename
 
 ! windspeed
 status=nf90_inq_varid(loc_ncid,'windspeed',loc_varid)
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))//'-> windspeed'
 
 status=nf90_get_var(loc_ncid,loc_varid,tm_windspeed,start=(/ 1, 1 /),count=(/ n_euphotic_boxes , 12 /))
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))//'-> windspeed'
 
 ! seaice fraction
 status=nf90_inq_varid(loc_ncid,'Fice',loc_varid)
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))//'-> Fice'
 
 status=nf90_get_var(loc_ncid,loc_varid,tm_seaice_frac,start=(/ 1, 1 /),count=(/ n_euphotic_boxes , 12 /))
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))//'-> Fice'
 
 ! T
 status=nf90_inq_varid(loc_ncid,'Tbc',loc_varid)
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))//'-> T'
 
 status=nf90_get_var(loc_ncid,loc_varid,tm_T,start=(/ 1, 1 /),count=(/ n_euphotic_boxes , 12 /))
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))//'-> T'
 
 ! S
 status=nf90_inq_varid(loc_ncid,'Sbc',loc_varid)
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))//'-> S'
 
 status=nf90_get_var(loc_ncid,loc_varid,tm_S,start=(/ 1, 1 /),count=(/ n_euphotic_boxes , 12 /))
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))//'-> S'
 
 ! silica
 status=nf90_inq_varid(loc_ncid,'silica',loc_varid)
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))//'-> Si'
 
 status=nf90_get_var(loc_ncid,loc_varid,tm_silica,start=(/ 1, 1 /),count=(/ n_euphotic_boxes , 12 /))
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))//'-> Si'
 
 
 ! close netcdf file
@@ -552,6 +563,82 @@ end subroutine
 
 ! ---------------------------------------------------------------------------------------!
 
+subroutine load_TM_grid_data()
+
+! local variables
+integer::n,status,loc_varid,loc_ncid
+
+! open netcdf file
+status=nf90_open('../data/'//trim(tm_data_fileloc)//'/'//trim(tm_grid_data_filename) , nf90_nowrite,loc_ncid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))//'->'//tm_grid_data_filename
+
+! volume
+status=nf90_inq_varid(loc_ncid,'volume',loc_varid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))//'-> volume'
+
+status=nf90_get_var(loc_ncid,loc_varid,tm_vol)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))//'-> volume'
+
+! area
+status=nf90_inq_varid(loc_ncid,'area',loc_varid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))//'-> area'
+
+status=nf90_get_var(loc_ncid,loc_varid,tm_area)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))//'-> area'
+
+! longitude
+status=nf90_inq_varid(loc_ncid,'Longitude',loc_varid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))//'-> longitude'
+
+status=nf90_get_var(loc_ncid,loc_varid,tm_lon)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))//'->longitude'
+
+! latitude
+status=nf90_inq_varid(loc_ncid,'Latitude',loc_varid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))//'-> latitude'
+
+status=nf90_get_var(loc_ncid,loc_varid,tm_lat)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))//'-> latitude'
+
+! depth
+status=nf90_inq_varid(loc_ncid,'Depth',loc_varid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))//'-> depth'
+
+status=nf90_get_var(loc_ncid,loc_varid,tm_depth)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))//'-> depth'
+
+! i
+status=nf90_inq_varid(loc_ncid,'i',loc_varid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))//'-> i'
+
+status=nf90_get_var(loc_ncid,loc_varid,tm_i)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))//'-> i'
+
+! j
+status=nf90_inq_varid(loc_ncid,'j',loc_varid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))//'-> j'
+
+status=nf90_get_var(loc_ncid,loc_varid,tm_j)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))//'-> j'
+
+! k
+status=nf90_inq_varid(loc_ncid,'k',loc_varid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))//'-> k'
+
+status=nf90_get_var(loc_ncid,loc_varid,tm_k)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))//'-> k'
+
+
+! close netcdf file
+status=nf90_close(loc_ncid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+
+end subroutine load_TM_grid_data
+! ---------------------------------------------------------------------------------------!
+
+! ---------------------------------------------------------------------------------------!
+
 subroutine load_PO4_restore()
 
 ! local variables
@@ -561,14 +648,14 @@ integer::n,status,loc_varid,loc_ncid
 
 ! open netcdf file
 status=nf90_open('../data/'//trim(tm_data_fileloc)//'/'//trim(tm_PO4restore_filename), nf90_nowrite,loc_ncid)
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),tm_PO4restore_filename
 
 ! matrix values
 status=nf90_inq_varid(loc_ncid,'PO4_Obs',loc_varid)
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),'PO4_Obs'
 
 status=nf90_get_var(loc_ncid,loc_varid,bg_PO4_obs,start=(/ 1, 1 /),count=(/ n_euphotic_boxes , 12 /))
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),'PO4_Obs'
 !print*,bg_PO4_obs(1:10,1)
 
 ! close netcdf file
@@ -591,14 +678,14 @@ integer::n,status,loc_varid,loc_ncid
 
 ! open netcdf file
 status=nf90_open('../data/'//trim(tm_data_fileloc)//'/'//trim(tm_PO4uptake_filename), nf90_nowrite,loc_ncid)
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),tm_PO4uptake_filename
 
 ! matrix values
 status=nf90_inq_varid(loc_ncid,'PO4_Uptake',loc_varid)
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),'PO4uptake'
 
 status=nf90_get_var(loc_ncid,loc_varid,bg_PO4_uptake,start=(/ 1, 1 /),count=(/ n_euphotic_boxes , 12 /))
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),'PO4uptake'
 !print*,bg_PO4_uptake(1:10,1)
 
 ! close netcdf file
@@ -666,14 +753,14 @@ integer::n,status,loc_varid,loc_ncid
 
 ! open netcdf file
 status=nf90_open('../data/'//trim(tm_data_fileloc)//'/'//trim(tm_vol_filename) , nf90_nowrite,loc_ncid)
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),tm_vol_filename
 
 ! matrix values
 status=nf90_inq_varid(loc_ncid,'vol',loc_varid)
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),'vol'
 
 status=nf90_get_var(loc_ncid,loc_varid,tm_vol)
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),'vol'
 !print*,tm_vol(1:10,1)
 
 ! close netcdf file
@@ -829,50 +916,62 @@ end subroutine print_to_screen
 
 subroutine write_output_netcdf()
 
-integer::ncid,status,m_dimid,n_dimid,PO4id,DOPid,EXPORTid,n_season
-integer::dimids(gen_n_tracers)
+integer::ncid,status,m_dimid,n_dimid,PO4id,DOPid,EXPORTid,n_season,DICid,ALKid
+integer::dimids(2)
 
-! create file
-! status=nf90_create('../output/'//trim(gen_config_filename)//'.nc',nf90_clobber,ncid)
-! if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
-! 
-! define dimensions
-! status=nf90_def_dim(ncid,'tm_nbox',tm_nbox,m_dimid)
-! if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
-! 
-! status=nf90_def_dim(ncid,'time',n_seasonal,n_dimid)
-! if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
-! 
-! dimids=(/m_dimid,n_dimid/)
-! 
-! define variable
-! status=nf90_def_var(ncid,'PO4',nf90_float,dimids,PO4id)
-! if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
-! 
-! status=nf90_def_var(ncid,'DOP',nf90_float,dimids,DOPid)
-! if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
-! 
-! status=nf90_def_var(ncid,'EXPORT',nf90_float,dimids,EXPORTid)
-! if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
-! 
-! end definition
-! status=nf90_enddef(ncid)
-! if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
-! 
-! write data
-! status=nf90_put_var(ncid,PO4id,tracers_PO4_int(:,:))
-! if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
-! 
-! status=nf90_put_var(ncid,DOPid,tracers_DOP_int(:,:))
-! if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
-! 
-! status=nf90_put_var(ncid,EXPORTid,EXPORT_int(:,:))
-! if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
-! 
-! status=nf90_close(ncid)
-! if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
-! 
-! print*,'Output written to: ','../output/'//trim(gen_config_filename)//'.nc'
+!create file
+status=nf90_create('../output/'//trim(gen_config_filename)//'/fields_netcdf.nc',nf90_clobber,ncid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+!define dimensions
+status=nf90_def_dim(ncid,'tm_nbox',tm_nbox,m_dimid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+status=nf90_def_dim(ncid,'time',1,n_dimid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+dimids=(/m_dimid,n_dimid/)
+
+!define variable
+status=nf90_def_var(ncid,'PO4',nf90_float,dimids,PO4id)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+status=nf90_def_var(ncid,'DOP',nf90_float,dimids,DOPid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+status=nf90_def_var(ncid,'DIC',nf90_float,dimids,DICid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+status=nf90_def_var(ncid,'ALK',nf90_float,dimids,ALKid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+!status=nf90_def_var(ncid,'EXPORT',nf90_float,dimids,EXPORTid)
+!if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+!end definition
+status=nf90_enddef(ncid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+!write data
+status=nf90_put_var(ncid,PO4id,tracers(:,ioPO4))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+status=nf90_put_var(ncid,DOPid,tracers(:,ioDOP))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+status=nf90_put_var(ncid,DICid,tracers(:,ioDIC))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+status=nf90_put_var(ncid,ALKid,tracers(:,ioALK))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+!status=nf90_put_var(ncid,EXPORTid,EXPORT_int(:,:))
+!if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+status=nf90_close(ncid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+print*,'Output written to: ','../output/'//trim(gen_config_filename)//'.nc'
 
 end subroutine write_output_netcdf
 
@@ -974,6 +1073,11 @@ open(unit=10,file='../output/'//trim(gen_config_filename)//'/timeseries_ocn_ALK.
 write(unit=10,fmt='(A100)') '% / year / ALK inventory (mol) / [ALK] global (mmol m-3)' 
 close(unit=10)
 
+! gas exchange
+open(unit=10,file='../output/'//trim(gen_config_filename)//'/timeseries_airsea_CO2.dat',status='replace')
+write(unit=10,fmt='(A100)') '% / year / global mean (mol yr-1)' 
+close(unit=10)
+
 
 
 end subroutine initialise_timeseries_output
@@ -1003,9 +1107,14 @@ if(loc_t>=tm_timeseries(timeseries_count)*96-47 .and. loc_t<=tm_timeseries(times
 
 	! integrate 
 	scalar=bg_dt*tm_save_intra_freq
+	
 	tracers_int(:,:)=tracers_int(:,:)+tracers(:,:)*scalar
+	
 	ATM_int(:)=ATM_int(:)+ATM(:)*scalar
+	
 	t_int=t_int+((loc_t-1.0)/(1.0/bg_dt))*scalar
+	
+	diag_int=diag_int+diag(:,:)*scalar
 
 	! write when reached end of time period
 	! and reset integrating arrays
@@ -1015,6 +1124,7 @@ if(loc_t>=tm_timeseries(timeseries_count)*96-47 .and. loc_t<=tm_timeseries(times
 		ATM_int(:)=0.0
 		tracers_int(:,:)=0.0
 		t_int=0.0
+		diag_int=0.0
 	endif
 		
 	
@@ -1071,6 +1181,15 @@ t_int , &
 sum(tracers_int(:,ioALK)*tm_vol) , &
 sum(tracers_int(:,ioALK)*tm_vol)*rvol_tot*1.0e3
 close(unit=10)
+
+!gas exchange
+open(unit=10,file='../output/'//trim(gen_config_filename)//'/timeseries_airsea_CO2.dat',position='append')
+write(unit=10,fmt='(f12.1,e20.12)') &
+t_int , &
+sum(diag_int(:,2)*tm_vol)
+close(unit=10)
+
+
 
 
 end subroutine write_timeseries_output

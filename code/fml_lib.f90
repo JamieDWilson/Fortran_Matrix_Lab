@@ -15,8 +15,8 @@ integer::tm_nbox
 namelist /tm_namelist/ tm_n_dt,tm_Aexp_nnz,tm_Aimp_nnz,tm_Aremin_nnz,tm_nbox
 character(len=100)::tm_seaice_filename,tm_PO4restore_filename,tm_vol_filename,tm_PO4uptake_filename
 namelist /tm_namelist/ tm_seaice_filename,tm_PO4restore_filename,tm_vol_filename,tm_PO4uptake_filename
-character(len=100)::tm_bgc_data_filename
-namelist /tm_namelist/ tm_bgc_data_filename
+character(len=100)::tm_bgc_data_filename,tm_grid_data_filename
+namelist /tm_namelist/ tm_bgc_data_filename,tm_grid_data_filename
 logical::tm_seasonal
 namelist /tm_namelist/ tm_seasonal
 character(len=100)::tm_data_fileloc
@@ -75,12 +75,12 @@ type(sparse)::Aremin
 ! integer,dimension(:),allocatable::tm_Aexp_row,tm_Aimp_row,tm_Aremin_row
 !integer(kind=2),dimension(:),allocatable::tm_i,tm_j,tm_k
 real,dimension(:,:),allocatable::tm_seaice_frac
-real,dimension(:),allocatable::tm_vol
 real,dimension(:,:),allocatable::tm_windspeed
 real,dimension(:,:),allocatable::tm_T
 real,dimension(:,:),allocatable::tm_S
 real,dimension(:,:),allocatable::tm_silica
-real,dimension(:),allocatable::tm_area
+real,dimension(:),allocatable::tm_area,tm_vol,tm_i,tm_j,tm_k,tm_lon,tm_lat,tm_depth
+
 
 real,dimension(:),allocatable::seaice_dt
 real,dimension(:),allocatable::wind_dt
@@ -100,9 +100,11 @@ real,dimension(:,:),allocatable::J
 real,dimension(:,:),allocatable::particles
 real,dimension(:),allocatable::ATM
 real,dimension(:),allocatable::export
+real,dimension(:,:),allocatable::diag
 real,dimension(:,:),allocatable::tracers_int,EXPORT_int
 real,dimension(:),allocatable::ATM_int
 real::t_int=0.0
+real,dimension(:,:),allocatable::diag_int
 
 integer,dimension(:),allocatable::iSur
 real,dimension(:),allocatable::tm_timeseries
