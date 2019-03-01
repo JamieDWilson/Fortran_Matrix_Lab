@@ -26,7 +26,7 @@ namelist /tm_namelist/ tm_data_fileloc
 real::bg_uptake_tau
 REAL::bg_DOC_k
 namelist /tm_namelist/ bg_uptake_tau,bg_DOC_k
-integer::bg_dt_ratio
+real::bg_dt_ratio
 namelist /tm_namelist/ bg_dt_ratio
 character(len=100)::bg_martin_b_input_filename
 namelist /tm_namelist / bg_martin_b_input_filename
@@ -34,14 +34,16 @@ real::bg_DOC_frac
 namelist / tm_namelist / bg_DOC_frac
 integer::bg_n_euphotic_lyrs
 namelist / tm_namelist / bg_n_euphotic_lyrs
-logical::bg_PO4restore_select
-namelist / tm_namelist / bg_PO4restore_select
+character(len=100)::bg_uptake_function
+namelist / tm_namelist / bg_uptake_function
 logical::bg_O_select,bg_C_select
 namelist / tm_namelist / bg_O_select,bg_C_select
 logical::bg_restore_atm_CO2
 namelist / tm_namelist / bg_restore_atm_CO2
 real::bg_restore_atm_CO2_target
 namelist / tm_namelist / bg_restore_atm_CO2_target
+real::bg_gastransfer_a
+namelist / tm_namelist / bg_gastransfer_a
 
 ! general model parameters
 integer::gen_n_tracers
@@ -66,20 +68,18 @@ end type sparse
 type(sparse)::Aexp
 type(sparse)::Aimp
 type(sparse)::Aremin
-!type(sparse)::I
+!type(sparse)::I ! identity matrix
+type(sparse)::Aconv ! convert indices
 
 
 ! ******************* allocatable ***********************!
-! real,dimension(:),allocatable::tm_Aexp,tm_Aimp,tm_Aremin
-! integer,dimension(:),allocatable::tm_Aexp_col,tm_Aimp_col,tm_Aremin_col	
-! integer,dimension(:),allocatable::tm_Aexp_row,tm_Aimp_row,tm_Aremin_row
-!integer(kind=2),dimension(:),allocatable::tm_i,tm_j,tm_k
 real,dimension(:,:),allocatable::tm_seaice_frac
 real,dimension(:,:),allocatable::tm_windspeed
 real,dimension(:,:),allocatable::tm_T
 real,dimension(:,:),allocatable::tm_S
 real,dimension(:,:),allocatable::tm_silica
-real,dimension(:),allocatable::tm_area,tm_vol,tm_i,tm_j,tm_k,tm_lon,tm_lat,tm_depth
+real,dimension(:),allocatable::tm_area,tm_vol,tm_lon,tm_lat,tm_depth,tm_depth_btm
+integer,dimension(:),allocatable::tm_i,tm_j,tm_k,tm_wc
 
 
 real,dimension(:),allocatable::seaice_dt
@@ -97,6 +97,7 @@ real,dimension(:,:),allocatable::tracers_1
 real,dimension(:,:),allocatable::C
 real,dimension(:,:),allocatable::C_consts
 real,dimension(:,:),allocatable::J
+real,dimension(:,:),allocatable::Jatm
 real,dimension(:,:),allocatable::particles
 real,dimension(:),allocatable::ATM
 real,dimension(:),allocatable::export
@@ -113,10 +114,10 @@ real,dimension(:),allocatable::tm_timeseries
 ! ******************* global variables ***********************!
 real::gen_conv_d_yr=365.25
 real::bg_DOC_rfrac
-REAL::bg_PO4_init=2.17/1e3 ! initial PO4 (mmol m-3 -> mol m-3) (Kriest et al., 2010)
-REAL::bg_DOC_init=0.0001/1e3 ! inital DOP (mmol m-3 -> mol m-3) (Kriest et al., 2010)
-real::bg_DIC_init=2299.0/1e3 !(mmol m-3 -> mol m-3) 
-real::bg_ALK_init=2420.9/1e3 !(mmol m-3 -> mol m-3) 
+REAL::bg_PO4_init=0.00217 ! initial PO4 (mmol m-3 -> mol m-3) (Kriest et al., 2010)
+REAL::bg_DOC_init=0.0001*1E-03 ! inital DOP (mmol m-3 -> mol m-3) (Kriest et al., 2010)
+real::bg_DIC_init=2.299 !(mmol m-3 -> mol m-3)
+real::bg_ALK_init=2.420 !(mmol m-3 -> mol m-3)
 real::bg_dt
 integer::ioPO4,ioDOP,ioDIC,ioALK
 integer::ioCO2,ioCO3,ioH,iopCO2
@@ -132,7 +133,7 @@ integer::n_seasonal
 integer::n_euphotic_boxes
 integer::n_surface_boxes
 
-logical::gen_restart_select=.false.
+logical::gen_restart_select=.false. ! default value that will reset if restart selected at cmd line
 character(len=100)::gen_config_filename,gen_restart_filename
 
 real::bg_C_to_P=116.0
@@ -140,15 +141,13 @@ real::bg_N_to_P=16.0
 
 real,dimension(5,2)::Sc_coeffs ! 4 if using older values
 real,dimension(6,2)::Bunsen_coeffs
-real,dimension(7,2)::Sol_Orr 
+real,dimension(7,2)::Sol_Orr
 
 real::conv_sec_yr=60.0*60.0*24.0*365.25
 
 integer::n_ATM_tracers
 real::ATM_vol
 real::ATM_mol
-real::bg_gastransfer_a=6.97e-7 ! see Orr et al., (2017), eqn. 13
-!real::bg_gastransfer_a=0.251
 real::rho=1024.5 ! kg m-3
 real::r_rho=1.0/1024.5 ! m3 kg-1
 
@@ -170,9 +169,9 @@ character(len=100)::arg
 ! read command line variables
 do i=1,iargc()
 	CALL getarg(i,arg)
-	
+
 	if(i.eq.1)then
-		gen_config_filename=arg ! config 
+		gen_config_filename=arg ! config
 	else if(i.eq.2)then
 		read(arg,*) gen_runtime_years ! runtime
 	else if(i.eq.3)then
@@ -186,6 +185,12 @@ print*,trim(gen_config_filename)
 open(unit=20,file='../experiments/'//trim(gen_config_filename),status='old',action='read')
 read(unit=20,nml=tm_namelist,iostat=ios)
 close(unit=20)
+
+! write out copy of namelist file
+!open(unit=20,file='../output/'//trim(gen_config_filename)//'/parameter_namelist.txt',status='replace')
+!write( UNIT=20, NML=tm_namelist)
+!close(unit=20)
+
 
 end subroutine load_namelist
 

@@ -12,7 +12,7 @@ contains
 subroutine initialise_model()
 
 ! local variables
-integer::n 
+integer::n
 character(8)::date
 character(10)::time
 character(5)::zone
@@ -93,30 +93,35 @@ Aimp%nnz=tm_Aimp_nnz
 Aremin%nnz=tm_Aremin_nnz
 
 allocate(Aexp%val(Aexp%nnz,n_seasonal))
-allocate(Aexp%row(tm_nbox+1)) 
+allocate(Aexp%row(tm_nbox+1))
 allocate(Aexp%col(Aexp%nnz))
 
 allocate(Aimp%val(Aimp%nnz,n_seasonal))
 allocate(Aimp%row(tm_nbox+1))
 allocate(Aimp%col(Aimp%nnz))
 
-allocate(Aremin%val(Aremin%nnz,1)) 
+allocate(Aremin%val(Aremin%nnz,1))
 allocate(Aremin%row(tm_nbox+1))
 allocate(Aremin%col(Aremin%nnz))
 
+allocate(Aconv%val(tm_nbox,1))
+allocate(Aconv%row(tm_nbox))
+allocate(Aconv%col(tm_nbox))
+
 allocate(tracers(tm_nbox,gen_n_tracers))
 allocate(tracers_1(tm_nbox,gen_n_tracers))
-allocate(C(tm_nbox,3))
+allocate(C(tm_nbox,4))
 allocate(C_consts(tm_nbox,9))
 allocate(ATM(n_ATM_tracers))
 allocate(J(tm_nbox,gen_n_tracers))
+allocate(Jatm(n_surface_boxes,n_ATM_tracers))
 allocate(particles(tm_nbox,gen_n_tracers))
 allocate(export(tm_nbox))
 allocate(tracers_int(tm_nbox,gen_n_tracers))
 allocate(EXPORT_int(tm_nbox,n_seasonal))
 allocate(ATM_int(n_ATM_tracers))
-allocate(diag(tm_nbox,2)) ! n.b. second dimension hard-coded currently
-allocate(diag_int(tm_nbox,2)) ! n.b. second dimension hard-coded currently
+allocate(diag(tm_nbox,3)) ! n.b. second dimension hard-coded currently
+allocate(diag_int(tm_nbox,3)) ! n.b. second dimension hard-coded currently
 
 allocate(iSur(n_euphotic_boxes))
 allocate(tm_seaice_frac(n_euphotic_boxes,n_seasonal))
@@ -129,6 +134,8 @@ allocate(tm_k(tm_nbox))
 allocate(tm_lon(tm_nbox))
 allocate(tm_lat(tm_nbox))
 allocate(tm_depth(tm_nbox))
+allocate(tm_depth_btm(tm_nbox))
+allocate(tm_wc(tm_nbox))
 allocate(tm_T(n_euphotic_boxes,n_seasonal))
 allocate(tm_S(n_euphotic_boxes,n_seasonal))
 allocate(tm_silica(n_euphotic_boxes,n_seasonal))
@@ -142,6 +149,9 @@ allocate(S_dt(n_euphotic_boxes))
 allocate(silica_dt(n_euphotic_boxes))
 
 call load_TM_data()
+call find_water_columns()
+call create_Aconv()
+
 
 ! surface indices (are the first 4448 entries to the vector)
 do n=1,n_euphotic_boxes
@@ -151,23 +161,27 @@ end do
 
 ! initialise tracer array
 if(gen_restart_select)then
+	call load_restart()
 else
 	tracers_1(:,ioPO4)=bg_PO4_init
 	tracers_1(:,ioDOP)=bg_DOC_init
 	tracers_1(:,ioDIC)=bg_DIC_init
 	tracers_1(:,ioALK)=bg_ALK_init
-	end if
+	ATM(iaCO2)=278.0*1.0e-6
+end if
 tracers(:,:)=0.0
 J(:,:)=0.0
 tracers_int(:,:)=0.0
 ATM_int(:)=0.0
 EXPORT_int(:,:)=0.0
 diag_int(:,:)=0.0
+Jatm(:,:)=0.0
 dt_count=1 ! keep track of how many timesteps have passed in one year
 
 ! convert parameters to correct units
-tm_dt=1.0/tm_n_dt ! TMM timestep
+tm_dt=1.0/real(tm_n_dt) ! TMM timestep
 bg_dt=tm_dt*bg_dt_ratio ! BGC timestep
+
 
 bg_DOC_rfrac=1.0-bg_DOC_frac ! reciprical of DOC fraction
 !bg_DOC_k=1.0/bg_DOC_k ! year-1
@@ -178,7 +192,7 @@ bg_uptake_tau=(1.0/bg_uptake_tau)*gen_conv_d_yr ! days to years-1
 
 Sc_coeffs(:,iaCO2)=(/2116.8 , -136.25 , 4.7353 , -0.092307 , 0.0007555/)   ! CO2 Wanninkhof (2014), Orr et al., 2017, Table 1
 SC_coeffs(:,iaO2)=(/1920.4 , -135.6 , 5.2122 , -0.10939 , 0.00093777/)   ! O2 Wanninkhof (2014), Orr et al., 2017, Table 1
-      
+
 Bunsen_coeffs(:,iaO2)=(/-58.3877 , 85.8079 , 23.8439 , -0.034892 , 0.015568 , -0.0019387/) ! O2
 Bunsen_coeffs(:,iaCO2)=(/ -60.2409 , 93.4517 , 23.3585 , 0.0023517 , -0.023656 , 0.0047036 /) ! CO2
 
@@ -188,7 +202,7 @@ Sol_Orr(:,iaCO2)=(/-160.7333 , 215.4152 , 89.8920 , -1.47759 , 0.029941 , -0.027
 !Sol_Orr(:,iaCO2)=(/-162.8301 , 218.2968 , 90.9241 , -1.47696 , 0.025695 , -0.025225 , 0.0049867/) ! CO2, Orr et al., 2017, Table 2 as mol kg-1 for checking
 
 ATM_vol=7777.0 * sum(tm_area(1:n_surface_boxes)) ! height (m) * total area (m2)
-ATM_mol=1.77e20 ! 
+ATM_mol=1.77e20 !
 
 ! temporary code
 C(:,:)=-1.0
@@ -196,8 +210,7 @@ C_consts(:,:)=0.0
 !tm_T(:,:)=20.0
 !tm_S(:,:)=30.0
 !tm_windspeed(:,:)=0.0
-tm_area=1.0
-ATM(iaCO2)=278.0*1.0e-6
+!ATM(iaCO2)=278.0*1.0e-6
 
 ! print final header
 print*,'*************************'
@@ -219,7 +232,7 @@ end subroutine initialise_model
 subroutine calc_seasonal_scaling
 
 ! local variables
-integer::n,count,nn
+integer::n,count,nn,n_dt_season
 
 if(tm_seasonal)then
 	n_seasonal=12
@@ -237,9 +250,11 @@ tm_seasonal_n2=0.0
 
 if(tm_seasonal)then
 
+n_dt_season=int(real(tm_n_dt)/real(12))
+
 count=1
-do n=1,tm_n_dt,tm_n_dt/12
-	do nn=0,(tm_n_dt/12)-1
+do n=1,tm_n_dt,n_dt_season
+	do nn=0,(n_dt_season)-1
 		tm_seasonal_n1(n+nn)=count
 		tm_seasonal_n2(n+nn)=count+1
 	end do
@@ -247,25 +262,25 @@ do n=1,tm_n_dt,tm_n_dt/12
 end do
 where(tm_seasonal_n2==13) tm_seasonal_n2=1
 
-do n=1,tm_n_dt,tm_n_dt/12
-	DO nn=0,(tm_n_dt/12)-1
-		tm_seasonal_rscale(nn+n)=real(nn)/(real(tm_n_dt/12)-1)
+do n=1,tm_n_dt,n_dt_season
+	DO nn=0,(n_dt_season)-1
+		tm_seasonal_rscale(nn+n)=real(nn)/(real(n_dt_season)-1)
 		tm_seasonal_scale(nn+n)=1.0-tm_seasonal_rscale(nn+n)
 	end do
 end do
-		
+
 else
 	count=1
 	do n=1,tm_n_dt
 
 		tm_seasonal_n1(n)=count
 		tm_seasonal_n2(n)=count
-		
+
 		tm_seasonal_scale(n)=1.0
 		tm_seasonal_rscale(n)=1.0-tm_seasonal_scale(n)
-	
+
 	end do
-	
+
 end if
 
 !print*,'n1',tm_seasonal_n1
@@ -290,8 +305,8 @@ end if
 	!~ sum_val=sum_val+jul_days(n-1)
 	!~ jul_cumdays(n)=sum_val
 !~ end do
-	
-	
+
+
 !~ if(tm_seasonal)then
 	!~ n_seasonal=12
 !~ else
@@ -316,8 +331,8 @@ end if
 		!~ count=count+1
 	!~ end do
 	!~ where(tm_seasonal_n2==13) tm_seasonal_n2=1
-	
-	
+
+
 	!~ sum_val=0.0
 	!~ do n=1,12
 		!~ do nn=jul_cumdays(n),jul_cumdays(n+1)-1
@@ -336,12 +351,12 @@ end if
 
 		!~ tm_seasonal_n1(n)=count
 		!~ tm_seasonal_n2(n)=count
-		
+
 		!~ tm_seasonal_scale(n)=1.0
 		!~ tm_seasonal_rscale(n)=1.0-tm_seasonal_scale(n)
-	
+
 	!~ end do
-	
+
 !~ end if
 
 
@@ -365,39 +380,20 @@ real,dimension(A%nnz)::val_tmp
 
 vector_size=shape(Vector)
 
-! tmp code
-!print*,dt_count
-!print*,tm_seasonal_scale(dt_count),tm_seasonal_rscale(dt_count)
-!print*,tm_seasonal_n1(dt_count),tm_seasonal_n2(dt_count)
 val_tmp=(tm_seasonal_scale(dt_count)*A%val(:,tm_seasonal_n1(dt_count)))&
 +&
 ((tm_seasonal_rscale(dt_count))*A%val(:,tm_seasonal_n2(dt_count)))
-! tmp code
-!PRINT*,val_tmp(1:10)
 
-
-
-! sum_val=sum_val+A%val(nn,1)*Vector(A%col(nn),i)
 DO i=1,vector_size(2)
 do n=1,tm_nbox
 	sum_val=0.0
-	
-	!print*,n
-	!PRINT*,A%row(n)
-	!PRINT*,A%row(n+1)-1
-	!PRINT*,val_tmp(A%row(n))
-	!PRINT*,Vector(A%col(A%row(n)),i)
-	
+
 	do nn=A%row(n),A%row(n+1)-1
 		sum_val=sum_val+val_tmp(nn)*Vector(A%col(nn),i)
 	end do
 	amul(n,i)=sum_val
 end do
 end do
-
-!sum_val=sum_val+&
-!((A%val(nn)*Vector(A%col(nn),i)*tm_seasonal_scale(1))+&
-!(A%val(nn)*Vector(A%col(nn),i)*(1.0-tm_seasonal_scale(1))))
 
 end FUNCTION
 
@@ -418,13 +414,7 @@ real::sum_val
 
 do n=1,tm_nbox
 	sum_val=0.0
-	
-	!print*,n
-	!PRINT*,A%row(n)
-	!PRINT*,A%row(n+1)-1
-	!PRINT*,A%val(A%row(n),1)
-	!PRINT*,Vector(A%col(A%row(n)))
-	
+
 	do nn=A%row(n),A%row(n+1)-1
 		sum_val=sum_val+A%val(nn,1)*Vector(A%col(nn))
 	end do
@@ -438,13 +428,43 @@ end FUNCTION
 
 ! ---------------------------------------------------------------------------------------!
 
+FUNCTION amul_transpose(A,Vector)
+! output
+REAL,dimension(tm_nbox)::amul_transpose
+! dummy
+type(sparse),intent(in)::A
+REAL,INTENT(in),dimension(tm_nbox)::Vector
+! local
+integer::n,nn,i
+real::sum_val
+real,dimension(tm_nbox)::tmp
+
+amul_transpose=0.0
+do n=1,tm_nbox
+
+	do nn=A%row(n),A%row(n+1)-1
+		amul_transpose(A%col(nn))=amul_transpose(A%col(nn))+Vector(n)*A%val(nn,1)
+	end do
+end do
+
+end FUNCTION
+
+! ---------------------------------------------------------------------------------------!
+
+! ---------------------------------------------------------------------------------------!
+
 subroutine print_to_screen(dum_t,dum_extra)
 
 integer::dum_t
-real::dum_extra
+real::dum_extra,vol_rtot
 
-print*,'year',dum_t/tm_n_dt,sum(tracers_1(:,ioPO4)*tm_vol),sum(tracers_1(:,ioDOP)*tm_vol),sum(tracers_1(:,ioDIC)*tm_vol), &
- & sum(tracers_1(:,ioALK)*tm_vol),ATM(iaCO2)*1.0e6,dum_extra
+vol_rtot=1.0/sum(tm_vol)
+
+print*,'year',dum_t/tm_n_dt,sum(tracers_1(:,ioPO4)*tm_vol)*vol_rtot*1.0e3, &
+sum(tracers_1(:,ioDOP)*tm_vol)*vol_rtot*1.0e3, &
+sum(tracers_1(:,ioDIC)*tm_vol)*vol_rtot*1.0e3, &
+sum(tracers_1(:,ioALK)*tm_vol)*vol_rtot*1.0e3, &
+ATM(iaCO2)*1.0e6,dum_extra
 
 
 
@@ -483,7 +503,9 @@ silica_dt=(tm_seasonal_scale(dt_count)*tm_silica(:,tm_seasonal_n1(dt_count))) &
 ! convert wind_dt to correct units for gas exchange
 ! not pre-calculated due to non-linear terms (u^2)
 !!!! *** windspeed is m/s? so adjust this line of code *** !!!!
-wind_dt=(wind_dt**2)*bg_gastransfer_a*seaice_dt*conv_sec_yr
+wind_dt=(wind_dt*wind_dt)*bg_gastransfer_a*seaice_dt*conv_sec_yr
+
+
 
 
 end subroutine tm_vars_at_dt
@@ -499,27 +521,17 @@ integer,intent(inOUT)::save_count
 integer,intent(in)::loc_t
 real::scalar
 
-
-
-!tracers_PO4_int(:,save_count)=tracers_PO4_int(:,save_count)+tracers(:,ioPO4)*tm_dt*n_seasonal
-!tracers_DOP_int(:,save_count)=tracers_DOP_int(:,save_count)+tracers(:,ioDOP)*tm_dt*n_seasonal
-!EXPORT_int(:,save_count)=EXPORT_int(:,save_count)+export(:)*tm_dt*n_seasonal
-
-!if(mod(dt_count,tm_n_dt/n_seasonal).eq.0 .and. tm_seasonal)then
-!	save_count=save_count+1
-!end if
-
 if(loc_t>=tm_timeseries(timeseries_count)*96-47 .and. loc_t<=tm_timeseries(timeseries_count)*96+48)then
 
-	! integrate 
+	! integrate
 	scalar=bg_dt*tm_save_intra_freq
-	
+
 	tracers_int(:,:)=tracers_int(:,:)+tracers(:,:)*scalar
-	
+
 	ATM_int(:)=ATM_int(:)+ATM(:)*scalar
-	
+
 	t_int=t_int+((loc_t-1.0)/(1.0/bg_dt))*scalar
-	
+
 	diag_int=diag_int+diag(:,:)*scalar
 
 	! write when reached end of time period
@@ -532,11 +544,57 @@ if(loc_t>=tm_timeseries(timeseries_count)*96-47 .and. loc_t<=tm_timeseries(times
 		t_int=0.0
 		diag_int=0.0
 	endif
-		
-	
+
+
 endif
 
 end subroutine integrate_output
 
+! ---------------------------------------------------------------------------------------!
+
+! ---------------------------------------------------------------------------------------!
+
+subroutine find_water_columns()
+
+integer::n,nn
+integer::i,j
+
+do n=1,n_surface_boxes
+	do nn=1,tm_nbox
+
+		i=tm_i(n)
+		j=tm_j(n)
+
+
+		if(tm_i(nn).eq.i .and. tm_j(nn).eq.j) tm_wc(nn)=n
+	enddo
+enddo
+
+
+end subroutine find_water_columns
+
+! ---------------------------------------------------------------------------------------!
+
+! ---------------------------------------------------------------------------------------!
+
+subroutine create_Aconv()
+
+integer::n,nn,count
+integer,dimension(tm_nbox)::tmp,tmp2
+
+
+count=1
+do n=1,n_surface_boxes
+	do nn=1,tm_nbox
+		if(tm_wc(nn)==n)then
+			Aconv%val(count,1)=1.0
+			Aconv%col(count)=nn
+			Aconv%row(count)=count
+			count=count+1
+		endif
+	enddo
+enddo
+
+end subroutine create_Aconv
 
 end module tm_module

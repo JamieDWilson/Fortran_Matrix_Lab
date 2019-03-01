@@ -13,8 +13,6 @@ contains
 
 subroutine load_TM_data()
 
-! load data from files
-
 call load_TM_netcdf('../data'//'/'//trim(tm_data_fileloc)//'/'//trim(tm_Aexp_filename),Aexp)
 call load_TM_netcdf('../data'//'/'//trim(tm_data_fileloc)//'/'//trim(tm_Aimp_filename),Aimp)
 call load_TM_netcdf(tm_Aremin_filename,Aremin)
@@ -22,16 +20,12 @@ call load_TM_netcdf(tm_Aremin_filename,Aremin)
 call load_TM_grid_data()
 call load_TM_bgc_data()
 
-if(bg_PO4restore_select)then
+select case(trim(bg_uptake_function))
+case('restore')
 	call load_PO4_restore()
-	else 
+case('fixed')
 	call load_PO4_uptake()
-end if
-
-if(gen_restart_select)then
-	call load_restart()
-end if
-
+end select
 
 end subroutine load_TM_data
 
@@ -48,7 +42,7 @@ type(sparse)::dum_A
 integer::loc_ncid,loc_varid,status
 character(len=100)::loc_lname
 
-!print*,'loading TM data from:',trim(dum_filename)
+print*,'loading TM data from:',trim(dum_filename)
 
 ! open netcdf file
 status=nf90_open(trim(dum_filename),nf90_nowrite,loc_ncid)
@@ -132,6 +126,13 @@ if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))//'-> depth'
 
 status=nf90_get_var(loc_ncid,loc_varid,tm_depth)
 if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))//'-> depth'
+
+! bottom depth
+status=nf90_inq_varid(loc_ncid,'Depth_Btm',loc_varid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))//'-> depth_btm'
+
+status=nf90_get_var(loc_ncid,loc_varid,tm_depth_btm)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))//'-> depth_btm'
 
 ! i
 status=nf90_inq_varid(loc_ncid,'i',loc_varid)
@@ -220,7 +221,7 @@ if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
 ! convert to fraction of grid-box not covered, so as to calculate once only
 tm_seaice_frac=1.0-tm_seaice_frac
 
-end subroutine 
+end subroutine
 
 ! ---------------------------------------------------------------------------------------!
 ! load_PO4_restore
@@ -250,7 +251,7 @@ if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),'PO4_Obs'
 status=nf90_close(loc_ncid)
 if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
 
-end subroutine 
+end subroutine
 
 ! ---------------------------------------------------------------------------------------!
 ! load_PO4_uptake
@@ -358,32 +359,37 @@ subroutine initialise_timeseries_output()
 
 ! atm CO2
 open(unit=10,file='../output/'//trim(gen_config_filename)//'/timeseries_atm_CO2.dat',status='replace')
-write(unit=10,fmt='(A44)') '% / year / atmospheric CO2 (ppmv)' 
+write(unit=10,fmt='(A44)') '% / year / atmospheric CO2 (mol) / atmospheric CO2 (ppmv)'
 close(unit=10)
 
 ! PO4
 open(unit=10,file='../output/'//trim(gen_config_filename)//'/timeseries_ocn_PO4.dat',status='replace')
-write(unit=10,fmt='(A100)') '% / year / PO4 inventory (mol) / [PO4] global (mmol m-3)' 
+write(unit=10,fmt='(A100)') '% / year / PO4 inventory (mol) / [PO4] global (mmol m-3) / [PO4] surface (mmol m-3)'
 close(unit=10)
 
 ! DOP
 open(unit=10,file='../output/'//trim(gen_config_filename)//'/timeseries_ocn_DOP.dat',status='replace')
-write(unit=10,fmt='(A100)') '% / year / DOP inventory (mol) / [DOP] global (mmol m-3)' 
+write(unit=10,fmt='(A100)') '% / year / DOP inventory (mol) / [DOP] global (mmol m-3)'
 close(unit=10)
 
 ! DIC
 open(unit=10,file='../output/'//trim(gen_config_filename)//'/timeseries_ocn_DIC.dat',status='replace')
-write(unit=10,fmt='(A100)') '% / year / DIC inventory (mol) / [DIC] global (mmol m-3)' 
+write(unit=10,fmt='(A100)') '% / year / DIC inventory (mol) / [DIC] global (mmol m-3) / [DIC] surface (mmol m-3)'
 close(unit=10)
 
 ! ALK
 open(unit=10,file='../output/'//trim(gen_config_filename)//'/timeseries_ocn_ALK.dat',status='replace')
-write(unit=10,fmt='(A100)') '% / year / ALK inventory (mol) / [ALK] global (mmol m-3)' 
+write(unit=10,fmt='(A100)') '% / year / ALK inventory (mol) / [ALK] global (mmol m-3)'
 close(unit=10)
 
 ! gas exchange
 open(unit=10,file='../output/'//trim(gen_config_filename)//'/timeseries_airsea_CO2.dat',status='replace')
-write(unit=10,fmt='(A100)') '% / year / global mean (mol yr-1)' 
+write(unit=10,fmt='(A100)') '% / year / global mean flux (mol yr-1) / global mean flux (mol m-2 yr-1)'
+close(unit=10)
+
+! POM EXPORT
+open(unit=10,file='../output/'//trim(gen_config_filename)//'/timeseries_POM_export.dat',status='replace')
+write(unit=10,fmt='(A100)') '% / year / global mean flux (mol yr-1) / global mean flux (mol m-2 yr-1)'
 close(unit=10)
 
 
@@ -391,30 +397,35 @@ close(unit=10)
 end subroutine initialise_timeseries_output
 
 ! ---------------------------------------------------------------------------------------!
-! initialise_timeseries_output
+! write_timeseries_output
 ! - writes output to timeseries output files
 ! ---------------------------------------------------------------------------------------!
 
 
 subroutine write_timeseries_output()
 
-real::rvol_tot
+real::rvol_tot,rvol_sur_tot,rvol_deep_tot
 
 rvol_tot=1.0/sum(tm_vol)
+rvol_sur_tot=1.0/sum(tm_vol(1:n_surface_boxes))
+rvol_deep_tot=1.0/sum(tm_vol(41153:52749))
 
 ! CO2
 open(unit=10,file='../output/'//trim(gen_config_filename)//'/timeseries_atm_CO2.dat',position='append')
-write(unit=10,fmt='(f12.1,f12.6)') &
+write(unit=10,fmt='(f12.1,e20.12,f12.6)') &
 t_int , &
+ATM_int(iaCO2)*ATM_vol, &
 ATM_int(iaCO2)*1.0e6
 close(unit=10)
 
 !PO4
 open(unit=10,file='../output/'//trim(gen_config_filename)//'/timeseries_ocn_PO4.dat',position='append')
-write(unit=10,fmt='(f12.1,e20.12,f12.6)') &
+write(unit=10,fmt='(f12.1,e20.12,f12.6,f12.6,f12.6)') &
 t_int , &
 sum(tracers_int(:,ioPO4)*tm_vol) , &
-sum(tracers_int(:,ioPO4)*tm_vol)*rvol_tot*1.0e3
+sum(tracers_int(:,ioPO4)*tm_vol)*rvol_tot*1.0e3 , &
+sum(tracers_int(1:n_surface_boxes,ioPO4)*tm_vol(1:n_surface_boxes))*rvol_sur_tot*1.0e3 , &
+sum(tracers_int(41153:52749,ioPO4)*tm_vol(41153:52749))*rvol_deep_tot*1.0e3
 close(unit=10)
 
 !DOP
@@ -427,10 +438,12 @@ close(unit=10)
 
 !DIC
 open(unit=10,file='../output/'//trim(gen_config_filename)//'/timeseries_ocn_DIC.dat',position='append')
-write(unit=10,fmt='(f12.1,e20.12,f12.6)') &
+write(unit=10,fmt='(f12.1,e20.12,f12.6,f12.6,f12.6)') &
 t_int , &
 sum(tracers_int(:,ioDIC)*tm_vol) , &
-sum(tracers_int(:,ioDIC)*tm_vol)*rvol_tot*1.0e3
+sum(tracers_int(:,ioDIC)*tm_vol)*rvol_tot*1.0e3 , &
+sum(tracers_int(1:n_surface_boxes,ioDIC)*tm_vol(1:n_surface_boxes))*rvol_sur_tot*1.0e3 , &
+sum(tracers_int(41153:52749,ioDIC)*tm_vol(41153:52749))*rvol_deep_tot*1.0e3
 close(unit=10)
 
 !ALK
@@ -443,9 +456,17 @@ close(unit=10)
 
 !gas exchange
 open(unit=10,file='../output/'//trim(gen_config_filename)//'/timeseries_airsea_CO2.dat',position='append')
+write(unit=10,fmt='(f12.1,e20.12,e20.12)') &
+t_int , &
+sum(diag_int(:,2)), &
+sum(diag_int(:,2))/sum(tm_area(1:n_surface_boxes)) ! check this
+close(unit=10)
+
+!gas exchange
+open(unit=10,file='../output/'//trim(gen_config_filename)//'/timeseries_POM_export.dat',position='append')
 write(unit=10,fmt='(f12.1,e20.12)') &
 t_int , &
-sum(diag_int(:,2)*tm_vol)
+sum(diag_int(:,3))
 close(unit=10)
 
 
@@ -462,7 +483,7 @@ end subroutine write_timeseries_output
 
 subroutine write_output_netcdf()
 
-integer::ncid,status,m_dimid,n_dimid,PO4id,DOPid,EXPORTid,n_season,DICid,ALKid
+integer::ncid,status,m_dimid,n_dimid,PO4id,DOPid,EXPORTid,n_season,DICid,ALKid,airseaCO2id
 integer::dimids(2)
 
 !create file
@@ -491,6 +512,9 @@ if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
 status=nf90_def_var(ncid,'ALK',nf90_float,dimids,ALKid)
 if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
 
+status=nf90_def_var(ncid,'airsea_CO2_flux',nf90_float,dimids,airseaCO2id)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
 !status=nf90_def_var(ncid,'EXPORT',nf90_float,dimids,EXPORTid)
 !if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
 
@@ -509,6 +533,9 @@ status=nf90_put_var(ncid,DICid,tracers(:,ioDIC))
 if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
 
 status=nf90_put_var(ncid,ALKid,tracers(:,ioALK))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+status=nf90_put_var(ncid,airseaCO2id,diag(:,1))
 if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
 
 !status=nf90_put_var(ncid,EXPORTid,EXPORT_int(:,:))
@@ -534,7 +561,7 @@ open(unit=10,form='unformatted',status='replace',action='write',iostat=ios, &
 file='../output/'//trim(gen_config_filename)//'/restart/restart.bin')
 write(10) tracers_1 , ATM
 close(10,iostat=ios)
- 
+
 end subroutine write_restart
 
 ! ---------------------------------------------------------------------------------------!

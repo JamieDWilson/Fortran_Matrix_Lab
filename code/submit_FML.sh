@@ -3,7 +3,7 @@
 
 RUNPATH=$HOME/scripts/Fortran_Matrix_Lab/code
 cd $RUNPATH
-
+make
 
 if [ -n "$3" ]; then
 	./FML $1 $2 $3

@@ -2,7 +2,7 @@
 # defining variables
 objects = fml.o fml_lib.o io_module.o tm_module.o bg_module.o
 compiler = gfortran
-switch = -O3
+switch = -O3 -fdefault-real-8
 netcdf_switch = -L/share/apps/netcdf-4.0/gcc-4.4.7/lib -lnetcdf
 
 # Makefile

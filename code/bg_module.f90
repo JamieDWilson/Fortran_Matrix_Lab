@@ -16,50 +16,38 @@ integer::n
 real::uptake
 real,dimension(n_euphotic_boxes)::tmp_PO4
 
-! linearly interpolate seaice arrays
-!tmp_Fice=(tm_seasonal_scale(dt_count)*tm_seaice_frac(:,tm_seasonal_n1(dt_count)))&
-!+&
-!((tm_seasonal_rscale(dt_count))*tm_seaice_frac(:,tm_seasonal_n2(dt_count)))
-
 do n=1,n_euphotic_boxes
 
 	uptake=0.0
 
-	if(bg_PO4restore_select)then
-		
-		! linearly interpolate PO4 obs arrays
+	select case(trim(bg_uptake_function))
+	case('restore')
 		tmp_PO4=(tm_seasonal_scale(dt_count)*bg_PO4_obs(:,tm_seasonal_n1(dt_count)))&
-		+&
+		+ &
 		((tm_seasonal_rscale(dt_count))*bg_PO4_obs(:,tm_seasonal_n2(dt_count)))
-
 		if(tracers_1(n,ioPO4)>tmp_PO4(n)) uptake=seaice_dt(n)*bg_uptake_tau*(tracers_1(n,ioPO4)-tmp_PO4(n)) ! PO4 uptake
-		
-
-	else
-	
-		! linearly interpolate PO4 uptake arrays
+	case('fixed')
 		tmp_PO4=(tm_seasonal_scale(dt_count)*bg_PO4_uptake(:,tm_seasonal_n1(dt_count)))&
-		+&
+		+ &
 		(tm_seasonal_rscale(dt_count)*bg_PO4_uptake(:,tm_seasonal_n2(dt_count)))
-
-
 		if(tracers_1(n,ioPO4)-(tmp_PO4(n)*bg_dt)>0.0) uptake=tmp_PO4(n) ! PO4 uptake
-			
-	end if
-	
+	case('abiotic')
+		uptake=0.0
+	end select
+
 	J(n,ioPO4)=J(n,ioPO4)-uptake ! PO4
 	J(n,ioDOP)=J(n,ioDOP)+bg_DOC_frac*uptake ! DOP
-	particles(n,ioPO4)=particles(n,ioPO4)+bg_DOC_rfrac*uptake ! POP	
-	
+	particles(n,ioPO4)=particles(n,ioPO4)+bg_DOC_rfrac*uptake ! POP
+
 	if(bg_C_select)then
-		J(n,ioDIC)=J(n,ioDIC)-uptake*bg_C_to_P
-		J(n,ioALK)=J(n,ioALK)+uptake*bg_N_to_P
+		J(n,ioDIC)=J(n,ioDIC)-(uptake*bg_C_to_P)
+		J(n,ioALK)=J(n,ioALK)+(uptake*bg_N_to_P)
 	end if
-	
+
+	diag(n,3)=uptake*tm_vol(n) ! mol
 	export(n)=uptake! export for saving output
-	
+
 end do
-	
 
 
 end subroutine PO4_uptake
@@ -76,23 +64,20 @@ real::remin
 do n=1,tm_nbox
 
 	if(tracers_1(n,ioDOP).gt.1e-8)then ! Kriest et al., (2010) . Also smaller concentrations slow down the matrix calculation significantly.
+
 		remin=tracers_1(n,ioDOP)*bg_DOC_k
 
 		if(remin*bg_dt.lt.tracers_1(n,ioDOP))then ! catch remineralisation making DOP go negative
 			J(n,ioPO4)=J(n,ioPO4)+remin ! DOP remin -> PO4
 			J(n,ioDOP)=J(n,ioDOP)-remin ! DOP remin <- DOP
+
+			if(bg_C_select)then
+				J(n,ioDIC)=J(n,ioDIC)+(remin*bg_C_to_P)
+				J(n,ioALK)=J(n,ioALK)-(remin*bg_N_to_P)
+			end if
+
 		end if
-		
-		!if(bg_O_select)then
-		!	J(n,iO2)=J(n,iO2)+remin*bg_P_to_O
-		!endif
-		
-		if(bg_C_select)then
-			J(n,ioDIC)=J(n,ioDIC)+remin*bg_C_to_P
-			J(n,ioALK)=J(n,ioALK)-remin*bg_N_to_P
-		end if
-		
-	
+
 	end if
 
 end do
@@ -110,14 +95,10 @@ real,dimension(tm_nbox)::remin
 remin=amul_remin(Aremin,(particles(:,ioPO4))) ! POP remineralisation
 J(:,ioPO4)=J(:,ioPO4)+remin
 
-!print*,sum(amul_remin(Aremin,(particles(:,ioPO4)))*tm_vol)
-!print*,sum(particles(:,ioPO4)*tm_vol)
-
 if(bg_C_select)then
-	J(:,ioDIC)=J(:,ioDIC)+remin*bg_C_to_P
-	J(:,ioALK)=J(:,ioALK)-remin*bg_N_to_P
+	J(:,ioDIC)=J(:,ioDIC)+(remin*bg_C_to_P)
+	J(:,ioALK)=J(:,ioALK)-(remin*bg_N_to_P)
 endif
-
 
 end subroutine POP_remin
 
@@ -127,7 +108,7 @@ end subroutine POP_remin
 ! ---------------------------------------------------------------------------------------!
 
 subroutine update_bgc()
-integer::n,n_tracer 
+integer::n,n_tracer
 
 do n_tracer=1,gen_n_tracers
 	do n=1,tm_nbox
@@ -135,14 +116,7 @@ do n_tracer=1,gen_n_tracers
 	enddo
 enddo
 
-		!do n=1,tm_nbox
-	!		tracers(n,1)=tracers(n,1)+J(n,1)*bg_dt
-	!	end do
-	!	
-	!	do n=1,tm_nbox
-	!		tracers(n,2)=tracers(n,2)+J(n,2)*bg_dt
-	!	end do
-			
+ATM(iaCO2)=ATM(iaCO2)+sum(Jatm(:,iaCO2))*bg_dt/ATM_mol
 
 end subroutine update_bgc
 
@@ -163,67 +137,67 @@ do n=1,n_surface_boxes
 
 	T = T_dt(n)+273.15
 	S = S_dt(n)
-	
+
 	! K1 (Roy et al., 1993)
 	C_consts(n,iK1)=exp(2.83655-2307.1266/T-1.5529413*log(T) &
 	-(0.207608410+4.0484/T)*sqrt(S) &
 	+0.0846834*S-0.00654208*S**(3.0/2.0)+log(1.0-0.001005*S))
-	
+
 	! K2 (Roy et al., 1993)
 	C_consts(n,iK2)=exp( &
 	-9.226508-3351.6106/T-0.2005743*log(T) &
 	-(0.106901773+23.9722/T)*sqrt(S) &
 	+0.1130822*S-0.00846934*S**(3.0/2.0)+log(1.0-0.001005*S))
-	
+
 	! K0 (Weiss 1974)
 	C_consts(n,iK0)=exp( &
 	9345.17/T-60.2409+23.3585*log(T/100.0) &
 	+S*(0.023517-0.00023656*T+0.0047036*(T/100.0)**2))
-	
+
 	! KB (Dickson 1990b(
 	C_consts(n,iKb)=exp( &
 	(-8966.90-2890.53*S**0.5-77.942*S+1.728*S**(3.0/2.0)-0.0996*S**2.0)/T &
 	+148.0248+137.1942*S**0.5+1.62142*S &
 	-(24.4344+25.085*S**0.5+0.2474*S)*log(T) &
 	+0.053105*S**0.5*T)
-	
+
 	! Kw (Millero 1995)
 	C_consts(n,iKw)=exp( &
 	148.96502-13847.26/T-23.6521*log(T) &
 	+(118.67/T-5.977+1.0495*log(T))*S**0.5-0.01615*S)
-	
+
 	!KSi (Millero 1995)
 	I=(19.924*S)/(1000.0-1.005*S)
 	!I=0.02*S
-	
+
 	C_consts(n,iKSi)=exp( &
 	-8904.2/T+117.385-19.334*log(T) &
 	+((-458.79/T+3.5913)*(I**(-0.5)) &
 	+(188.74/T-1.5998))*I &
 	+(-12.1652/T+0.07871)*(I**2) &
 	+log(1.0-0.001005*S))
-	
+
 	! KP1 (Millero 1995)
 	C_consts(n,iKp1)=exp( &
 	-4576.752/T+115.525-18.453*log(T) &
 	+(-106.736/T+0.69171)*S**0.5 &
 	+(-0.65643/T-0.01844)*S)
-	
+
 	! KP2 (Millero 1995)
 	C_consts(n,iKp2)=exp( &
 	-8814.715/T+172.0883-27.927*log(T) &
 	+(-160.34/T+1.3566)*S**0.5 &
 	+(0.37335/T-0.05778)*S)
-	
+
 	! KP3 (millero 1995)
 	C_consts(n,iKp3)=exp( &
 	-3070.75/T-18.141 &
 	+(17.27039/T+2.81197)*S**0.5 &
 	+(-44.99486/T-0.09984)*S)
-	
-	
 
-enddo 
+
+
+enddo
 ! compare with DOE (1994)
 !print*,'T',T
 !print*,'S',S
@@ -250,7 +224,7 @@ subroutine calc_pCO2()
 !.............................................................
 
 ! local variables
-real::pt,sit,ta,pCO2,dic,H,bt,k1,k2,k1p,k2p,k3p,kb,kw,ksi,k0 ! ff in original but not used, added k0
+real::pt,sit,ta,pco2,dic,H,bt,k1,k2,k1p,k2p,k3p,kb,kw,ksi,k0 ! ff in original but not used, added k0
 real::gamm,co2s,hg,cag,bohg,h3po4g,h2po4g,hpo4g,po4g,siooh3g,denom,dummy,fg
 integer::n,n_loop
 real::h_guess_1,h_guess_2
@@ -287,7 +261,7 @@ k0=C_consts(n,iK0)
 ! First guess of [H+]: from last timestep *OR* fixed for cold start
 
 if(C(n,ioH).eq.-1.0)then
-	hg=10e-8 ! cold start 
+	hg=10e-8 ! cold start
 	h_guess_1=1.0
 	h_guess_2=hg
 	else
@@ -343,9 +317,6 @@ C(n,ioCO2) = co2s*rho ! mol kg-1 -> mol m-3
 C(n,ioH) = H
 C(n,iopCO2) = pco2
 
-!print*,C(n,ioCO2),co2s,T_dt(n)+273.15,S_dt(n),dic,ta,pt,sit,bt,hg,H
-!STOP
-
 enddo
 
 end subroutine calc_pCO2
@@ -377,43 +348,15 @@ do n=1,n_surface_boxes
 	loc_Tr100=100.0/loc_TK
 	loc_T100=loc_TK/100.0
 	loc_T100_2=loc_T100*loc_T100
-	
+
 	if(bg_C_select)then
-	
-		!loc_T=T_dt(n)
-		!if(loc_T<0.0)loc_T=0.0
-		!IF(loc_T>30.0)loc_T=30.0
-		!loc_T2=loc_T*loc_T
-		!loc_T3=loc_T2*loc_T
-	
-		!Sc=Sc_coeffs(1,iaCO2)-&
-		!Sc_coeffs(2,iaCO2)*loc_T+&
-		!Sc_coeffs(3,iaCO2)*loc_T2-&
-		!Sc_coeffs(4,iaCO2)*loc_T3
-		
+
 		Sc=Sc_coeffs(1,iaCO2) &
 		+Sc_coeffs(2,iaCO2)*loc_T &
 		+Sc_coeffs(3,iaCO2)*loc_T2 &
 		+Sc_coeffs(4,iaCO2)*loc_T3 &
 		+Sc_coeffs(5,iaCO2)*loc_T4
-		
-		!loc_T=T_dt(n)
-		!loc_S=S_dt(n)
-		!if(loc_T<2.0)loc_T=2.0
-		!IF(loc_T>35.0)loc_T=35.0
-		!if(loc_S<26.0)loc_S=26.0
-		!IF(loc_S>43.0)loc_S=43.0
-		!loc_TK=loc_T+273.15
-		!loc_Tr100=loc_TK/100.0
-		
-		!Bunsen=exp(Bunsen_coeffs(1,iaCO2)+ &
-		!Bunsen_coeffs(2,iaCO2)*(100.0/loc_TK)+ &
-		!Bunsen_coeffs(3,iaCO2)*log(loc_Tr100)+ &
-		!loc_S* &
-		!(Bunsen_coeffs(4,iaCO2)+&
-		!Bunsen_coeffs(5,iaCO2)*loc_Tr100+&
-		!Bunsen_coeffs(6,iaCO2)*loc_Tr100*loc_Tr100))
-		
+
 		Sol=exp( &
 		Sol_Orr(1,iaCO2) &
 		+Sol_Orr(2,iaCO2)*loc_Tr100 &
@@ -423,35 +366,24 @@ do n=1,n_surface_boxes
 		(Sol_Orr(5,iaCO2) &
 		+Sol_Orr(6,iaCO2)*loc_T100 &
 		+Sol_Orr(7,iaCO2)*loc_T100_2)) ! mol L-3 atm-1
-		Sol=Sol*0.001 ! mol L-1 atm-1 -> mol m-3 atm-1
-		
-		!print*,Sol_Orr(1,iaCO2),Sol_Orr(2,iaCO2),Sol_Orr(3,iaCO2),Sol_Orr(4,iaCO2), &
-		!& Sol_Orr(5,iaCO2),Sol_Orr(6,iaCO2),Sol_Orr(7,iaCO2)
-		!print*,loc_T100,loc_Tr100,loc_T100_2,loc_S
-		
-		!Bunsen=Bunsen*1024.5*1.03-6 ! mol/(kg*atm) -> mol/(m3*uatm) 
-		
+		Sol=Sol*1000.0 ! mol L-1 atm-1 -> mol m-3 atm-1
+
 		kw=wind_dt(n)*((Sc/660.0)**(-0.5)) ! in m yr-1 (conversion factors and parameter a computed in wind_dt)
-		
+
 		CO2starair=Sol*ATM(iaCO2) ! [CO2*]sat (mol m-3)
-		!F_a2o=piston*ATM(iaCO2)*Bunsen
-		
+
 		CO2star=C(n,ioCO2) ! [CO2*] (mol m-3)
-		
-		gasex=kw*(CO2starair-CO2star)*(1./50.0) ! mol m-3 yr-1 (n.b. hard coded depth in m!!)
-		
-		!print*,ATM(iaCO2),C(n,ioCO2),kw,CO2star,CO2starair,Sol,gasex,loc_T,loc_S
-		!STOP
-				
+
+		gasex=kw*(CO2starair-CO2star)*(1./50.0) ! air -> sea, mol m-3 yr-1 (n.b. hard coded depth in m!!)
+
 		J(n,ioDIC)=J(n,ioDIC)+gasex ! update ocean source/sink
-		
-		ATM(iaCO2)=ATM(iaCO2)-(gasex*bg_dt*tm_vol(n))/ATM_mol ! update atmosphere 
-		
+		Jatm(n,iaCO2)=Jatm(n,iaCO2)-(gasex*tm_vol(n)) ! update atmosphere (mol yr-1)
+
 		diag(n,2)=gasex*tm_vol(n) ! mol yr-1
 		diag(n,1)=gasex*50.0 ! mol m-2 yr-1
-		
+
 	endif
-		
+
 enddo
 
 end subroutine calc_gasexchange
@@ -465,5 +397,99 @@ subroutine restore_atm_CO2()
 if(bg_restore_atm_CO2) ATM(iaCO2)=bg_restore_atm_CO2_target*1.0e-6
 
 end subroutine restore_atm_CO2
+
+! ---------------------------------------------------------------------------------------!
+
+! ---------------------------------------------------------------------------------------!
+
+subroutine POM_remin()
+
+integer::n,count,nn
+integer,dimension(maxval(tm_wc))::loc_wc_start
+integer,dimension(tm_nbox)::loc_wc
+real,dimension(tm_nbox)::loc_particles,loc_vol,remin,loc_depth_btm
+real::loc_poc,loc_remin_tot,loc_poc_copy
+
+! create copy of particles array (currently with export only) and reorder to water-column
+loc_particles=amul_remin(Aconv,PARTICLES(:,ioPO4))
+loc_wc=amul_remin(Aconv,real(tm_wc))
+loc_vol=amul_remin(Aconv,tm_vol)
+loc_depth_btm=amul_remin(Aconv,tm_depth_btm)
+
+! find water column starting points
+count=1
+do n=1,tm_nbox
+	if(loc_wc(n).gt.loc_wc(n-1))then
+		loc_wc_start(count)=n
+		count=count+1
+	endif
+enddo
+
+! pre-calculate curve
+! *** to add data!! ***
+remin=(loc_depth_btm/120.0)**(-0.2)
+remin=merge(remin,1.0,remin<1.0) ! set anything >1.0 to 1.0
+
+!
+! print*,remin(1:10)
+! do n=2,maxval(loc_wc)
+! 	loc_remin_tot=0.0
+! 	do nn=loc_wc_start(n-1),loc_wc_start(n)-1
+!
+! 		loc_remin_tot=loc_remin_tot+(remin(nn-1)-remin(nn))
+! 		print*,loc_remin_tot
+!
+! 		if(nn==(loc_wc_start(n)-1)) remin(nn)=remin(nn)+(1.0-loc_remin_tot)
+! 	enddo
+! 	print*,remin(1:10)
+! 	stop
+! 	!print*,remin(loc_wc_start(n-1):loc_wc_start(n)-1)
+! enddo
+
+
+! loop over water columns
+do n=2,maxval(loc_wc)
+	count=1
+	loc_remin_tot=0.0
+	loc_poc=0.0
+	loc_poc_copy=0.0
+	do nn=loc_wc_start(n-1),loc_wc_start(n)-1
+		if(count.le.bg_n_euphotic_lyrs)then
+			!if(n==20) print*,nn,loc_particles(nn),loc_vol(nn)
+			loc_poc=loc_poc+loc_particles(nn)*loc_vol(nn) ! integrate POM in surface layers (mol)
+			!loc_poc_copy=loc_poc_copy+loc_particles(nn)*loc_vol(nn)
+			loc_particles(nn)=0.0 ! set flux to zero
+			!if(n==20) print*,nn,loc_poc,loc_particles(nn)
+		else
+			loc_particles(nn)=(remin(nn-1)-remin(nn))*loc_poc
+			!loc_poc=loc_poc-((remin(nn-1)-remin(nn))*loc_poc)
+			loc_remin_tot=loc_remin_tot+(remin(nn-1)-remin(nn))
+			!if(n==20) print*,nn,loc_particles(nn),(remin(nn-1)-remin(nn))*loc_poc,(remin(nn-1)-remin(nn)),loc_remin_tot
+		endif
+		count=count+1
+		if(nn==(loc_wc_start(n)-1)) loc_particles(nn)=loc_particles(nn)+(1.0-loc_remin_tot)*loc_poc
+		!if(nn==(loc_wc_start(n)-1)) loc_particles(nn)=loc_particles(nn)+loc_poc
+		!print*,n,loc_particles(loc_wc_start(n-1):loc_wc_start(n)-1),'total',sum(loc_particles(loc_wc_start(n-1):loc_wc_start(n)-1))
+
+	enddo
+	!if(n==20)print*,n,loc_poc,loc_particles(loc_wc_start(n-1):loc_wc_start(n)-1),&
+	!&'total',sum(loc_particles(loc_wc_start(n-1):loc_wc_start(n)-1))
+
+	!if(sum(loc_particles(loc_wc_start(n-1):loc_wc_start(n)-1))/=loc_poc)then
+	!	print*,sum(loc_particles(loc_wc_start(n-1):loc_wc_start(n)-1)),loc_poc,n
+	!	stop
+	!endif
+
+enddo
+
+loc_particles=loc_particles/loc_vol ! mol -> mol m-3
+
+
+! reorder particles array
+particles(:,ioPO4)=amul_transpose(Aconv,loc_particles)
+J(:,ioPO4)=J(:,ioPO4)+particles(:,ioPO4) ! POP remineralisation
+
+end subroutine POM_remin
+
 
 end module bg_module
