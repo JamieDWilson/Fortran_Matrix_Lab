@@ -67,7 +67,7 @@ do t=1,gen_runtime_years*tm_n_dt
  	end if
  	call cpu_time(finish2)
 
-	call integrate_output(t,save_count)
+	call integrate_output(t,save_count,dt_count)
 
 	if(mod(t,tm_n_dt)==0.0)then
 		call print_to_screen(t,finish2-start2)
@@ -88,7 +88,6 @@ print*,
 
 ! write output to netcdf file
 print*,'*************************'
-call write_output_netcdf()
 call write_restart()
 print*,'*************************'
 

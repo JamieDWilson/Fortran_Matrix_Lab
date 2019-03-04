@@ -50,8 +50,8 @@ integer::gen_n_tracers
 namelist / tm_namelist / gen_n_tracers
 integer::gen_runtime_years
 namelist / tm_namelist / gen_runtime_years
-character(len=100)::gen_save_timeseries_file
-namelist /tm_namelist/ gen_save_timeseries_file
+character(len=100)::gen_save_timeseries_file,gen_save_timeslice_file
+namelist /tm_namelist/ gen_save_timeseries_file,gen_save_timeslice_file
 
 
 ! end of namelist definitions
@@ -108,7 +108,8 @@ real::t_int=0.0
 real,dimension(:,:),allocatable::diag_int
 
 integer,dimension(:),allocatable::iSur
-real,dimension(:),allocatable::tm_timeseries
+real,dimension(:),allocatable::tm_timeseries,tm_timeslice
+
 
 
 ! ******************* global variables ***********************!
@@ -155,6 +156,12 @@ real::carbchem_tol=0.01 ! tolerance for H+ convergence
 
 real::tm_save_intra_freq=1.0
 integer::timeseries_count=1
+integer::timeslice_count=1
+
+! grid-dimensions: hard-coded!
+integer::NZ = 15;
+integer::NY = 64;
+integer::NX = 128;
 
 contains
 ! ---------------------------------------------------------------------------------------!

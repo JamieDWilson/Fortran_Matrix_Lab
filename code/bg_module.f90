@@ -93,12 +93,15 @@ subroutine POP_remin()
 real,dimension(tm_nbox)::remin
 
 remin=amul_remin(Aremin,(particles(:,ioPO4))) ! POP remineralisation
+
 J(:,ioPO4)=J(:,ioPO4)+remin
 
 if(bg_C_select)then
 	J(:,ioDIC)=J(:,ioDIC)+(remin*bg_C_to_P)
 	J(:,ioALK)=J(:,ioALK)-(remin*bg_N_to_P)
 endif
+
+diag(:,4)=remin
 
 end subroutine POP_remin
 
@@ -374,13 +377,30 @@ do n=1,n_surface_boxes
 
 		CO2star=C(n,ioCO2) ! [CO2*] (mol m-3)
 
-		gasex=kw*(CO2starair-CO2star)*(1./50.0) ! air -> sea, mol m-3 yr-1 (n.b. hard coded depth in m!!)
+		gasex=kw*(CO2starair-CO2star)*(1.0/50.0) ! air -> sea, mol m-3 yr-1 (n.b. hard coded depth in m!!)
 
 		J(n,ioDIC)=J(n,ioDIC)+gasex ! update ocean source/sink
 		Jatm(n,iaCO2)=Jatm(n,iaCO2)-(gasex*tm_vol(n)) ! update atmosphere (mol yr-1)
 
 		diag(n,2)=gasex*tm_vol(n) ! mol yr-1
 		diag(n,1)=gasex*50.0 ! mol m-2 yr-1
+		! if(n.eq.2000)then
+		! print*,'n',n
+		! print*,'co2starair',CO2starair
+		! print*,'co2star',CO2star
+		! print*,'wind',wind_dt(n)
+		! print*,'Sc',Sc,((Sc/660.0)**(-0.5))
+		! print*,'T',T_dt(n)
+		! print*,'S',S_dt(n)
+		! print*,'dic',tracers_1(n,ioDIC) ! mol m-3 -> mol kg-1
+		! print*,'ta',tracers_1(n,ioALK) ! mol m-3 -> mol kg-1
+		! print*,'phos',tracers_1(n,ioPO4)! mol m-3 -> mol kg-1
+		! print*,'Si',(7.5/1.0e6)*rho
+		! print*,'CO2atm',ATM(iaCO2)
+		! print*,'gasex',kw*(CO2starair-0.17285),86.399*((Sc/660.0)**(-0.5))*(CO2starair-0.17285)
+		! stop
+		! endif
+
 
 	endif
 
@@ -405,7 +425,7 @@ end subroutine restore_atm_CO2
 subroutine POM_remin()
 
 integer::n,count,nn
-integer,dimension(maxval(tm_wc))::loc_wc_start
+integer,dimension(maxval(tm_wc))::loc_wc_start,loc_wc_end
 integer,dimension(tm_nbox)::loc_wc
 real,dimension(tm_nbox)::loc_particles,loc_vol,remin,loc_depth_btm
 real::loc_poc,loc_remin_tot,loc_poc_copy
@@ -416,19 +436,30 @@ loc_wc=amul_remin(Aconv,real(tm_wc))
 loc_vol=amul_remin(Aconv,tm_vol)
 loc_depth_btm=amul_remin(Aconv,tm_depth_btm)
 
-! find water column starting points
-count=1
-do n=1,tm_nbox
+! find water column starting/end points
+loc_wc_start(1)=1
+count=2
+do n=2,tm_nbox
 	if(loc_wc(n).gt.loc_wc(n-1))then
 		loc_wc_start(count)=n
+		loc_wc_end(count-1)=n-1
 		count=count+1
 	endif
 enddo
+loc_wc_end(maxval(tm_wc))=tm_nbox
+
+!print*,loc_wc(tm_nbox),loc_vol(tm_nbox),loc_depth_btm(tm_nbox)
+!stop
 
 ! pre-calculate curve
 ! *** to add data!! ***
-remin=(loc_depth_btm/120.0)**(-0.2)
-remin=merge(remin,1.0,remin<1.0) ! set anything >1.0 to 1.0
+remin=(loc_depth_btm/120.0)**(-0.858)
+!remin=merge(remin,1.0,remin<1.0) ! set anything >1.0 to 1.0
+!do n=1,maxval(loc_wc)
+!	print*,remin(loc_wc_start(n):loc_wc_end(n))
+!enddo
+!print*,loc_depth_btm(tm_nbox)
+!stop
 
 !
 ! print*,remin(1:10)
@@ -446,48 +477,72 @@ remin=merge(remin,1.0,remin<1.0) ! set anything >1.0 to 1.0
 ! 	!print*,remin(loc_wc_start(n-1):loc_wc_start(n)-1)
 ! enddo
 
+loc_particles=loc_particles*loc_vol ! mol m-3 -> mol
 
-! loop over water columns
-do n=2,maxval(loc_wc)
-	count=1
+do n=1,maxval(loc_wc)
 	loc_remin_tot=0.0
 	loc_poc=0.0
 	loc_poc_copy=0.0
-	do nn=loc_wc_start(n-1),loc_wc_start(n)-1
-		if(count.le.bg_n_euphotic_lyrs)then
-			!if(n==20) print*,nn,loc_particles(nn),loc_vol(nn)
-			loc_poc=loc_poc+loc_particles(nn)*loc_vol(nn) ! integrate POM in surface layers (mol)
-			!loc_poc_copy=loc_poc_copy+loc_particles(nn)*loc_vol(nn)
+	count=1
+	do nn=loc_wc_start(n),loc_wc_end(n)
+		if(count.le.bg_n_euphotic_lyrs)then ! surface
+			loc_poc=loc_poc+loc_particles(nn)! integrate POM in surface layers (mol)
 			loc_particles(nn)=0.0 ! set flux to zero
-			!if(n==20) print*,nn,loc_poc,loc_particles(nn)
-		else
+			count=count+1
+		elseif(count.gt.bg_n_euphotic_lyrs)then ! interior
 			loc_particles(nn)=(remin(nn-1)-remin(nn))*loc_poc
-			!loc_poc=loc_poc-((remin(nn-1)-remin(nn))*loc_poc)
 			loc_remin_tot=loc_remin_tot+(remin(nn-1)-remin(nn))
-			!if(n==20) print*,nn,loc_particles(nn),(remin(nn-1)-remin(nn))*loc_poc,(remin(nn-1)-remin(nn)),loc_remin_tot
+			count=count+1
 		endif
-		count=count+1
-		if(nn==(loc_wc_start(n)-1)) loc_particles(nn)=loc_particles(nn)+(1.0-loc_remin_tot)*loc_poc
-		!if(nn==(loc_wc_start(n)-1)) loc_particles(nn)=loc_particles(nn)+loc_poc
-		!print*,n,loc_particles(loc_wc_start(n-1):loc_wc_start(n)-1),'total',sum(loc_particles(loc_wc_start(n-1):loc_wc_start(n)-1))
+
+		! once reached the end of the wc, remin all remaining pom
+		if(nn.eq.loc_wc_end(n)) loc_particles(nn)=loc_particles(nn)+(1.0-loc_remin_tot)*loc_poc
 
 	enddo
-	!if(n==20)print*,n,loc_poc,loc_particles(loc_wc_start(n-1):loc_wc_start(n)-1),&
-	!&'total',sum(loc_particles(loc_wc_start(n-1):loc_wc_start(n)-1))
-
-	!if(sum(loc_particles(loc_wc_start(n-1):loc_wc_start(n)-1))/=loc_poc)then
-	!	print*,sum(loc_particles(loc_wc_start(n-1):loc_wc_start(n)-1)),loc_poc,n
-	!	stop
-	!endif
 
 enddo
 
-loc_particles=loc_particles/loc_vol ! mol -> mol m-3
+! ! loop over water columns
+! do n=2,maxval(loc_wc)
+! 	count=1
+! 	loc_remin_tot=0.0
+! 	loc_poc=0.0
+! 	loc_poc_copy=0.0
+! 	do nn=loc_wc_start(n-1),loc_wc_start(n)-1
+! 		if(count.le.bg_n_euphotic_lyrs)then
+! 			!if(n==20) print*,nn,loc_particles(nn),loc_vol(nn)
+! 			loc_poc=loc_poc+loc_particles(nn)*loc_vol(nn) ! integrate POM in surface layers (mol)
+! 			!loc_poc_copy=loc_poc_copy+loc_particles(nn)*loc_vol(nn)
+! 			loc_particles(nn)=0.0 ! set flux to zero
+! 			!if(n==20) print*,nn,loc_poc,loc_particles(nn)
+! 		else
+! 			loc_particles(nn)=(remin(nn-1)-remin(nn))*loc_poc
+! 			!loc_poc=loc_poc-((remin(nn-1)-remin(nn))*loc_poc)
+! 			loc_remin_tot=loc_remin_tot+(remin(nn-1)-remin(nn))
+! 			!if(n==20) print*,nn,loc_particles(nn),(remin(nn-1)-remin(nn))*loc_poc,(remin(nn-1)-remin(nn)),loc_remin_tot
+! 		endif
+! 		count=count+1
+! 		if(nn==(loc_wc_start(n)-1)) loc_particles(nn)=loc_particles(nn)+(1.0-loc_remin_tot)*loc_poc
+! 		!if(nn==(loc_wc_start(n)-1)) loc_particles(nn)=loc_particles(nn)+loc_poc
+! 		!print*,n,loc_particles(loc_wc_start(n-1):loc_wc_start(n)-1),'total',sum(loc_particles(loc_wc_start(n-1):loc_wc_start(n)-1))
+!
+! 	enddo
+! 	!if(n==20)print*,n,loc_poc,loc_particles(loc_wc_start(n-1):loc_wc_start(n)-1),&
+! 	!&'total',sum(loc_particles(loc_wc_start(n-1):loc_wc_start(n)-1))
+!
+! 	!if(sum(loc_particles(loc_wc_start(n-1):loc_wc_start(n)-1))/=loc_poc)then
+! 	!	print*,sum(loc_particles(loc_wc_start(n-1):loc_wc_start(n)-1)),loc_poc,n
+! 	!	stop
+! 	!endif
+!
+! enddo
 
+loc_particles=loc_particles/loc_vol ! mol -> mol m-3
 
 ! reorder particles array
 particles(:,ioPO4)=amul_transpose(Aconv,loc_particles)
 J(:,ioPO4)=J(:,ioPO4)+particles(:,ioPO4) ! POP remineralisation
+diag(:,4)=particles(:,ioPO4)
 
 end subroutine POM_remin
 

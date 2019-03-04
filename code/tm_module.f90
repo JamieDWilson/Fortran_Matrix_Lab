@@ -105,7 +105,7 @@ allocate(Aremin%row(tm_nbox+1))
 allocate(Aremin%col(Aremin%nnz))
 
 allocate(Aconv%val(tm_nbox,1))
-allocate(Aconv%row(tm_nbox))
+allocate(Aconv%row(tm_nbox+1))
 allocate(Aconv%col(tm_nbox))
 
 allocate(tracers(tm_nbox,gen_n_tracers))
@@ -121,7 +121,7 @@ allocate(tracers_int(tm_nbox,gen_n_tracers))
 allocate(EXPORT_int(tm_nbox,n_seasonal))
 allocate(ATM_int(n_ATM_tracers))
 allocate(diag(tm_nbox,3)) ! n.b. second dimension hard-coded currently
-allocate(diag_int(tm_nbox,3)) ! n.b. second dimension hard-coded currently
+allocate(diag_int(tm_nbox,4)) ! n.b. second dimension hard-coded currently
 
 allocate(iSur(n_euphotic_boxes))
 allocate(tm_seaice_frac(n_euphotic_boxes,n_seasonal))
@@ -417,10 +417,11 @@ do n=1,tm_nbox
 
 	do nn=A%row(n),A%row(n+1)-1
 		sum_val=sum_val+A%val(nn,1)*Vector(A%col(nn))
+		!print*,nn,A%row(n),A%row(n+1)-1,A%val(nn,1),Vector(A%col(nn))
 	end do
 	amul_remin(n)=sum_val
 end do
-
+!stop
 
 end FUNCTION
 
@@ -503,6 +504,7 @@ silica_dt=(tm_seasonal_scale(dt_count)*tm_silica(:,tm_seasonal_n1(dt_count))) &
 ! convert wind_dt to correct units for gas exchange
 ! not pre-calculated due to non-linear terms (u^2)
 !!!! *** windspeed is m/s? so adjust this line of code *** !!!!
+!print*,'wind m s-1',wind_dt(2000),seaice_dt(2000)
 wind_dt=(wind_dt*wind_dt)*bg_gastransfer_a*seaice_dt*conv_sec_yr
 
 
@@ -515,38 +517,47 @@ end subroutine tm_vars_at_dt
 ! ---------------------------------------------------------------------------------------!
 
 
-subroutine integrate_output(loc_t,save_count)
+subroutine integrate_output(loc_t,loc_save_count,loc_dt_count)
 
-integer,intent(inOUT)::save_count
-integer,intent(in)::loc_t
+integer,intent(inOUT)::loc_save_count
+integer,intent(in)::loc_t,loc_dt_count
 real::scalar
 
-if(loc_t>=tm_timeseries(timeseries_count)*96-47 .and. loc_t<=tm_timeseries(timeseries_count)*96+48)then
+!if(loc_t>=tm_timeseries(timeseries_count)*96-47 .and. loc_t<=tm_timeseries(timeseries_count)*96+48)then
 
 	! integrate
-	scalar=bg_dt*tm_save_intra_freq
+scalar=bg_dt*tm_save_intra_freq
 
-	tracers_int(:,:)=tracers_int(:,:)+tracers(:,:)*scalar
+tracers_int(:,:)=tracers_int(:,:)+tracers(:,:)*scalar
 
-	ATM_int(:)=ATM_int(:)+ATM(:)*scalar
+ATM_int(:)=ATM_int(:)+ATM(:)*scalar
 
-	t_int=t_int+((loc_t-1.0)/(1.0/bg_dt))*scalar
+t_int=t_int+((loc_t-1.0)/(1.0/bg_dt))*scalar
 
-	diag_int=diag_int+diag(:,:)*scalar
+diag_int=diag_int+diag(:,:)*scalar
 
-	! write when reached end of time period
-	! and reset integrating arrays
-	if(loc_t==tm_timeseries(timeseries_count)*96+48)then
+if(loc_dt_count.eq.tm_n_dt)then ! at end of model year
+
+	if(loc_t==tm_timeseries(timeseries_count)*96+48)then ! if within a timeseries save year
 		call write_timeseries_output()
 		timeseries_count=timeseries_count+1
+	endif
+
+	if(loc_t==tm_timeslice(timeslice_count)*96+48)then ! if within a timeslice save year
+		call write_output_netcdf()
+		timeslice_count=timeslice_count+1
+	endif
+	! write when reached end of time period
+	! and reset integrating arrays
+	!if(loc_t==tm_timeseries(timeseries_count)*96+48)then
 		ATM_int(:)=0.0
 		tracers_int(:,:)=0.0
 		t_int=0.0
 		diag_int=0.0
-	endif
-
-
 endif
+
+
+!endif
 
 end subroutine integrate_output
 
@@ -569,7 +580,6 @@ do n=1,n_surface_boxes
 		if(tm_i(nn).eq.i .and. tm_j(nn).eq.j) tm_wc(nn)=n
 	enddo
 enddo
-
 
 end subroutine find_water_columns
 
@@ -594,6 +604,7 @@ do n=1,n_surface_boxes
 		endif
 	enddo
 enddo
+Aconv%row(count)=count
 
 end subroutine create_Aconv
 

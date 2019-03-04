@@ -298,6 +298,7 @@ integer::iostat
 logical::exist_file
 real::tmp
 
+! ******************** timeseries ********************
 ! open, read file for dimension, and allocate
 INQUIRE(FILE='../data/'//trim(gen_save_timeseries_file), EXIST=exist_file)
 if(exist_file.eqv..false.) print*,'Timeseries input file does not exist'
@@ -318,6 +319,29 @@ allocate(tm_timeseries(var_count))
 ! read in timeseries save points
 open(UNIT=10,FILE='../data/'//trim(gen_save_timeseries_file))
 read(unit=10,iostat=iostat,fmt='(F10.1)') tm_timeseries
+close(unit=10)
+
+! ******************** timeslice ********************
+! open, read file for dimension, and allocate
+INQUIRE(FILE='../data/'//trim(gen_save_timeslice_file), EXIST=exist_file)
+if(exist_file.eqv..false.) print*,'Timeseries input file does not exist'
+
+open(UNIT=10,FILE='../data/'//trim(gen_save_timeslice_file))
+var_count=0
+DO
+	READ(UNIT=10,IOSTAT=iostat,FMT=*)  tmp
+	IF (iostat < 0) THEN
+       exit
+    ELSE
+       var_count=var_count+1
+    END IF
+END DO
+close(UNIT=10)
+allocate(tm_timeslice(var_count))
+
+! read in timeslice save points
+open(UNIT=10,FILE='../data/'//trim(gen_save_timeslice_file))
+read(unit=10,iostat=iostat,fmt='(F10.1)') tm_timeslice
 close(unit=10)
 
 end subroutine load_data_saving
@@ -345,8 +369,9 @@ if(exist_dir.eqv..false.)then
 	call system('mkdir ../output/'//trim(gen_config_filename)//'/restart')
 end if
 
-! initialise timeseries files
+! initialise timeseries and timeslice output files
 call initialise_timeseries_output()
+call initialise_timeslice_output()
 
 end subroutine initialise_output
 
@@ -475,29 +500,39 @@ close(unit=10)
 end subroutine write_timeseries_output
 
 ! ---------------------------------------------------------------------------------------!
-! write_output_netcdf
-! - writes output to timeslice output file
-! - n.b. currently just last timestep!
+! intitialise_timeslice_output
+! - create netcdf file for timeslice output
 ! ---------------------------------------------------------------------------------------!
 
+subroutine initialise_timeslice_output()
 
-subroutine write_output_netcdf()
-
-integer::ncid,status,m_dimid,n_dimid,PO4id,DOPid,EXPORTid,n_season,DICid,ALKid,airseaCO2id
-integer::dimids(2)
+	integer::ncid,status,m_dimid,n_dimid,PO4id,DOPid,EXPORTid,n_season,DICid,ALKid,airseaCO2id,popreminid,po4uptakeid
+	integer::lon_dimid,lat_dimid,depth_dimid
+	!integer::dimids(2)
+	integer::dimids(4)
 
 !create file
 status=nf90_create('../output/'//trim(gen_config_filename)//'/fields_netcdf.nc',nf90_clobber,ncid)
 if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
 
 !define dimensions
-status=nf90_def_dim(ncid,'tm_nbox',tm_nbox,m_dimid)
+!status=nf90_def_dim(ncid,'tm_nbox',tm_nbox,m_dimid)
+!if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+status=nf90_def_dim(ncid,'lon',NX,lon_dimid)
 if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
 
-status=nf90_def_dim(ncid,'time',1,n_dimid)
+status=nf90_def_dim(ncid,'lat',NY,lat_dimid)
 if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
 
-dimids=(/m_dimid,n_dimid/)
+status=nf90_def_dim(ncid,'depth',NZ,depth_dimid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+status=nf90_def_dim(ncid,'time',nf90_unlimited,n_dimid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+dimids=(/lon_dimid,lat_dimid,depth_dimid,n_dimid/)
+!dimids=(/m_dimid,n_dimid/)
 
 !define variable
 status=nf90_def_var(ncid,'PO4',nf90_float,dimids,PO4id)
@@ -515,6 +550,12 @@ if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
 status=nf90_def_var(ncid,'airsea_CO2_flux',nf90_float,dimids,airseaCO2id)
 if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
 
+status=nf90_def_var(ncid,'PO4_uptake',nf90_float,dimids,po4uptakeid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+status=nf90_def_var(ncid,'POP_remin',nf90_float,dimids,popreminid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
 !status=nf90_def_var(ncid,'EXPORT',nf90_float,dimids,EXPORTid)
 !if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
 
@@ -522,29 +563,86 @@ if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
 status=nf90_enddef(ncid)
 if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
 
-!write data
-status=nf90_put_var(ncid,PO4id,tracers(:,ioPO4))
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
-
-status=nf90_put_var(ncid,DOPid,tracers(:,ioDOP))
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
-
-status=nf90_put_var(ncid,DICid,tracers(:,ioDIC))
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
-
-status=nf90_put_var(ncid,ALKid,tracers(:,ioALK))
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
-
-status=nf90_put_var(ncid,airseaCO2id,diag(:,1))
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
-
-!status=nf90_put_var(ncid,EXPORTid,EXPORT_int(:,:))
-!if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
-
+! close file
 status=nf90_close(ncid)
 if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
 
-print*,'Output written to: ','../output/'//trim(gen_config_filename)//'.nc'
+
+
+end subroutine initialise_timeslice_output
+
+! ---------------------------------------------------------------------------------------!
+! write_output_netcdf
+! - writes output to timeslice output file
+! - n.b. currently just last timestep!
+! ---------------------------------------------------------------------------------------!
+
+
+subroutine write_output_netcdf()
+
+integer::ncid,status,var_id
+real,dimension(NX,NY,NZ)::field
+
+!open file
+status=nf90_open('../output/'//trim(gen_config_filename)//'/fields_netcdf.nc',nf90_write,ncid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+! inquire ids and write data
+
+! PO4
+status=nf90_inq_varid(ncid,'PO4',var_id)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+field=v2f(tracers_int(:,ioPO4))
+status=nf90_put_var(ncid,var_id,field,start=(/ 1, 1, 1, timeslice_count /),count=(/NX,NY,NZ,1/))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+! ! DOP
+status=nf90_inq_varid(ncid,'DOP',var_id)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+field=v2f(tracers_int(:,ioDOP))
+status=nf90_put_var(ncid,var_id,field,start=(/ 1, 1, 1, timeslice_count /),count=(/NX,NY,NZ,1/))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+!
+! ! DIC
+status=nf90_inq_varid(ncid,'DIC',var_id)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+field=v2f(tracers_int(:,ioDIC))
+status=nf90_put_var(ncid,var_id,field,start=(/ 1, 1, 1, timeslice_count /),count=(/NX,NY,NZ,1/))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+!
+! ! ALK
+status=nf90_inq_varid(ncid,'ALK',var_id)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+field=v2f(tracers_int(:,ioALK))
+status=nf90_put_var(ncid,var_id,field,start=(/ 1, 1, 1, timeslice_count /),count=(/NX,NY,NZ,1/))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+!
+! ! air-sea CO2 flux
+status=nf90_inq_varid(ncid,'airsea_CO2_flux',var_id)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+field=v2f(diag_int(:,1))
+status=nf90_put_var(ncid,var_id,field,start=(/ 1, 1, 1, timeslice_count /),count=(/NX,NY,NZ,1/))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+! ! PO4 uptake
+status=nf90_inq_varid(ncid,'PO4_uptake',var_id)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+field=v2f(diag_int(:,3))
+status=nf90_put_var(ncid,var_id,field,start=(/ 1, 1, 1, timeslice_count /),count=(/NX,NY,NZ,1/))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+! ! POP remin
+status=nf90_inq_varid(ncid,'POP_remin',var_id)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+field=v2f(diag_int(:,4))
+status=nf90_put_var(ncid,var_id,field,start=(/ 1, 1, 1, timeslice_count /),count=(/NX,NY,NZ,1/))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+! close file
+status=nf90_close(ncid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+!print*,'Output written to: ','../output/'//trim(gen_config_filename)//'.nc'
 
 end subroutine write_output_netcdf
 
@@ -579,6 +677,24 @@ read(10,iostat=ios) tracers_1 , ATM
 close(10,iostat=ios)
 
 end subroutine load_restart
+
+! ---------------------------------------------------------------------------------------!
+! v2f
+! - convert vector into field
+! ---------------------------------------------------------------------------------------!
+
+function v2f(vector)
+
+real,dimension(NX,NY,NZ)::v2f
+real,dimension(tm_nbox)::vector
+integer::n
+
+v2f(:,:,:)=0.0
+do n = 1,tm_nbox
+	 v2f(tm_i(n),tm_j(n),tm_k(n)) = vector(n);
+enddo
+
+end function v2f
 
 ! ---------------------------------------------------------------------------------------!
 ! END OF MODULE
