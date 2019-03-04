@@ -92,19 +92,22 @@ Aexp%nnz=tm_Aexp_nnz
 Aimp%nnz=tm_Aimp_nnz
 Aremin%nnz=tm_Aremin_nnz
 
-allocate(Aexp%val(Aexp%nnz,n_seasonal))
+allocate(Aexp%val_n(Aexp%nnz,n_seasonal))
+allocate(Aexp%val(Aexp%nnz))
 allocate(Aexp%row(tm_nbox+1))
 allocate(Aexp%col(Aexp%nnz))
 
-allocate(Aimp%val(Aimp%nnz,n_seasonal))
+allocate(Aimp%val_n(Aimp%nnz,n_seasonal))
+allocate(Aimp%val(Aimp%nnz))
 allocate(Aimp%row(tm_nbox+1))
 allocate(Aimp%col(Aimp%nnz))
 
-allocate(Aremin%val(Aremin%nnz,1))
+allocate(Aremin%val_n(Aremin%nnz,1))
+allocate(Aremin%val(Aremin%nnz))
 allocate(Aremin%row(tm_nbox+1))
 allocate(Aremin%col(Aremin%nnz))
 
-allocate(Aconv%val(tm_nbox,1))
+allocate(Aconv%val(tm_nbox))
 allocate(Aconv%row(tm_nbox+1))
 allocate(Aconv%col(tm_nbox))
 
@@ -363,89 +366,149 @@ end if
 end subroutine calc_seasonal_scaling
 
 ! ---------------------------------------------------------------------------------------!
+! integrate model
+! - integrates model forward in time
+! - calculates Aimp*(Aexp*c+q) (Khatiwala 2007: eqn. 2)
+! ---------------------------------------------------------------------------------------!
+
+subroutine integrate_model()
+
+integer::n
+
+! explicit step (Aexp*C)
+do n=1,gen_n_tracers
+	tracers(:,n)=amul(Aexp,tracers_1(:,n))
+enddo
+
+! source/sinks (+q)
+tracers(:,:)=tracers(:,:)+J(:,:)*bg_dt
+ATM(iaCO2)=ATM(iaCO2)+sum(Jatm(:,iaCO2))*bg_dt/ATM_mol
+
+! implicit step (Aimp*...)
+do n=1,gen_n_tracers
+	tracers(:,n)=amul(Aimp,tracers(:,n))
+enddo
+
+tracers_1=tracers
+
+end subroutine integrate_model
 
 ! ---------------------------------------------------------------------------------------!
 
-FUNCTION amul(A,Vector)
+! ---------------------------------------------------------------------------------------!
+
+! FUNCTION amul(A,Vector)
+! ! output
+! REAL,dimension(tm_nbox,gen_n_tracers)::amul
+! ! dummy
+! type(sparse),intent(in)::A
+! REAL,INTENT(in),dimension(tm_nbox,gen_n_tracers)::Vector
+! ! local
+! integer::n,nn,i
+! real::sum_val
+! integer,dimension(2)::vector_size
+! real,dimension(A%nnz)::val_tmp
+!
+! vector_size=shape(Vector)
+!
+! val_tmp=(tm_seasonal_scale(dt_count)*A%val(:,tm_seasonal_n1(dt_count)))&
+! +&
+! ((tm_seasonal_rscale(dt_count))*A%val(:,tm_seasonal_n2(dt_count)))
+!
+! DO i=1,vector_size(2)
+! do n=1,tm_nbox
+! 	sum_val=0.0
+!
+! 	do nn=A%row(n),A%row(n+1)-1
+! 		sum_val=sum_val+val_tmp(nn)*Vector(A%col(nn),i)
+! 	end do
+! 	amul(n,i)=sum_val
+! end do
+! end do
+!
+! end FUNCTION
+
+! ---------------------------------------------------------------------------------------!
+
+! ---------------------------------------------------------------------------------------!
+
+! FUNCTION amul_remin(A,Vector)
+! ! output
+! REAL,dimension(tm_nbox)::amul_remin
+! ! dummy
+! type(sparse),intent(in)::A
+! REAL,INTENT(in),dimension(tm_nbox)::Vector
+! ! local
+! integer::n,nn,i
+! real::sum_val
+!
+!
+! do n=1,tm_nbox
+! 	sum_val=0.0
+!
+! 	do nn=A%row(n),A%row(n+1)-1
+! 		sum_val=sum_val+A%val(nn,1)*Vector(A%col(nn))
+! 		!print*,nn,A%row(n),A%row(n+1)-1,A%val(nn,1),Vector(A%col(nn))
+! 	end do
+! 	amul_remin(n)=sum_val
+! end do
+! !stop
+!
+! end FUNCTION
+
+! ---------------------------------------------------------------------------------------!
+! amul
+! - matrix-vector multiplication (CSR Format)
+! - adapted from SPARSKIT
+! ---------------------------------------------------------------------------------------!
+
+FUNCTION amul(A,vector)
 ! output
-REAL,dimension(tm_nbox,gen_n_tracers)::amul
+REAL,dimension(tm_nbox)::amul
 ! dummy
 type(sparse),intent(in)::A
-REAL,INTENT(in),dimension(tm_nbox,gen_n_tracers)::Vector
+REAL,INTENT(in),dimension(tm_nbox)::vector
 ! local
-integer::n,nn,i
+integer::n,nn
 real::sum_val
-integer,dimension(2)::vector_size
-real,dimension(A%nnz)::val_tmp
 
-vector_size=shape(Vector)
-
-val_tmp=(tm_seasonal_scale(dt_count)*A%val(:,tm_seasonal_n1(dt_count)))&
-+&
-((tm_seasonal_rscale(dt_count))*A%val(:,tm_seasonal_n2(dt_count)))
-
-DO i=1,vector_size(2)
-do n=1,tm_nbox
+do n=1,size(vector)
 	sum_val=0.0
 
 	do nn=A%row(n),A%row(n+1)-1
-		sum_val=sum_val+val_tmp(nn)*Vector(A%col(nn),i)
+		sum_val=sum_val+A%val(nn)*vector(A%col(nn))
 	end do
-	amul(n,i)=sum_val
-end do
+
+	amul(n)=sum_val
+
 end do
 
 end FUNCTION
 
 ! ---------------------------------------------------------------------------------------!
-
+! amul_transpose
+! - matrix transpose - vector multiplication (CSR Format)
+! - adapted from SPARSKIT
 ! ---------------------------------------------------------------------------------------!
 
-FUNCTION amul_remin(A,Vector)
-! output
-REAL,dimension(tm_nbox)::amul_remin
-! dummy
-type(sparse),intent(in)::A
-REAL,INTENT(in),dimension(tm_nbox)::Vector
-! local
-integer::n,nn,i
-real::sum_val
-
-
-do n=1,tm_nbox
-	sum_val=0.0
-
-	do nn=A%row(n),A%row(n+1)-1
-		sum_val=sum_val+A%val(nn,1)*Vector(A%col(nn))
-		!print*,nn,A%row(n),A%row(n+1)-1,A%val(nn,1),Vector(A%col(nn))
-	end do
-	amul_remin(n)=sum_val
-end do
-!stop
-
-end FUNCTION
-
-! ---------------------------------------------------------------------------------------!
-
-! ---------------------------------------------------------------------------------------!
-
-FUNCTION amul_transpose(A,Vector)
+FUNCTION amul_transpose(A,vector)
 ! output
 REAL,dimension(tm_nbox)::amul_transpose
 ! dummy
 type(sparse),intent(in)::A
-REAL,INTENT(in),dimension(tm_nbox)::Vector
+REAL,INTENT(in),dimension(tm_nbox)::vector
 ! local
 integer::n,nn,i
 real::sum_val
 real,dimension(tm_nbox)::tmp
 
 amul_transpose=0.0
-do n=1,tm_nbox
+do n=1,size(vector)
 
 	do nn=A%row(n),A%row(n+1)-1
-		amul_transpose(A%col(nn))=amul_transpose(A%col(nn))+Vector(n)*A%val(nn,1)
+		amul_transpose(A%col(nn))=amul_transpose(A%col(nn))+Vector(n)*A%val(nn)
 	end do
+
 end do
 
 end FUNCTION
@@ -506,6 +569,15 @@ silica_dt=(tm_seasonal_scale(dt_count)*tm_silica(:,tm_seasonal_n1(dt_count))) &
 !!!! *** windspeed is m/s? so adjust this line of code *** !!!!
 !print*,'wind m s-1',wind_dt(2000),seaice_dt(2000)
 wind_dt=(wind_dt*wind_dt)*bg_gastransfer_a*seaice_dt*conv_sec_yr
+
+! seasonal matrix values
+Aexp%val=(tm_seasonal_scale(dt_count)*Aexp%val_n(:,tm_seasonal_n1(dt_count))) &
++&
+((tm_seasonal_rscale(dt_count))*Aexp%val_n(:,tm_seasonal_n2(dt_count)))
+
+Aimp%val=(tm_seasonal_scale(dt_count)*Aimp%val_n(:,tm_seasonal_n1(dt_count))) &
++&
+((tm_seasonal_rscale(dt_count))*Aimp%val_n(:,tm_seasonal_n2(dt_count)))
 
 
 
@@ -597,7 +669,7 @@ count=1
 do n=1,n_surface_boxes
 	do nn=1,tm_nbox
 		if(tm_wc(nn)==n)then
-			Aconv%val(count,1)=1.0
+			Aconv%val(count)=1.0
 			Aconv%col(count)=nn
 			Aconv%row(count)=count
 			count=count+1

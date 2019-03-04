@@ -28,20 +28,22 @@ do t=1,gen_runtime_years*tm_n_dt
 	particles(:,:)=0.0
 	export(:)=0.0
 	Jatm(:,:)=0.0
-	call cpu_time(start2)
-	if(mod(t,int(bg_dt_ratio))==0)THEN ! circulation + biogeochemistry step
 
-		call tm_vars_at_dt()
+	call tm_vars_at_dt()
+
+	call cpu_time(start2)
+
+	if(mod(t,int(bg_dt_ratio))==0)THEN ! biogeochemistry source/sink
 
 		if(bg_C_select)then
-		call calc_C_consts()
-		call calc_pCO2()
+			call calc_C_consts()
+			call calc_pCO2()
 		end if
 
 		call PO4_uptake()
 
-		call POP_remin()
-		!call POM_remin()
+		!call POP_remin()
+		call POM_remin()
 
 		call DOP_remin()
 
@@ -49,25 +51,13 @@ do t=1,gen_runtime_years*tm_n_dt
 
 		call restore_atm_CO2()
 
-		!call cpu_time(start2)
-		tracers=amul(Aexp,tracers_1)
-		call update_bgc()
-		tracers=amul(Aimp,tracers)
-		tracers_1=tracers
-		!call cpu_time(finish2)
+	end if
 
-	else ! circulation only step
-		call cpu_time(start2)
-		tracers=amul(Aexp,tracers_1)
-		tracers=amul(Aimp,tracers)
-		tracers_1=tracers
-
-		!call cpu_time(finish2)
-
- 	end if
- 	call cpu_time(finish2)
+	call integrate_model()
 
 	call integrate_output(t,save_count,dt_count)
+
+	call cpu_time(finish2)
 
 	if(mod(t,tm_n_dt)==0.0)then
 		call print_to_screen(t,finish2-start2)

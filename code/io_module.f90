@@ -16,6 +16,7 @@ subroutine load_TM_data()
 call load_TM_netcdf('../data'//'/'//trim(tm_data_fileloc)//'/'//trim(tm_Aexp_filename),Aexp)
 call load_TM_netcdf('../data'//'/'//trim(tm_data_fileloc)//'/'//trim(tm_Aimp_filename),Aimp)
 call load_TM_netcdf(tm_Aremin_filename,Aremin)
+Aremin%val=Aremin%val_n(:,1) ! tmp
 
 call load_TM_grid_data()
 call load_TM_bgc_data()
@@ -52,7 +53,7 @@ if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),dum_filename
 status=nf90_inq_varid(loc_ncid,'A_val',loc_varid)
 if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),'A_val'
 
-status=nf90_get_var(loc_ncid,loc_varid,dum_A%val)
+status=nf90_get_var(loc_ncid,loc_varid,dum_A%val_n)
 if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),'A_val'
 
 ! matrix column indices

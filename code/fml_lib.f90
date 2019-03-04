@@ -58,7 +58,8 @@ namelist /tm_namelist/ gen_save_timeseries_file,gen_save_timeslice_file
 
 ! define sparse matrix type
 type sparse
-	real,allocatable,dimension(:,:)::val
+	real,allocatable,dimension(:,:)::val_n
+	real,allocatable,dimension(:)::val
 	integer(KIND=4),allocatable,dimension(:)::row
 	integer(KIND=4),allocatable,dimension(:)::col
 	integer::nnz
