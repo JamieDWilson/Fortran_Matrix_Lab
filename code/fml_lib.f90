@@ -44,6 +44,10 @@ real::bg_restore_atm_CO2_target
 namelist / tm_namelist / bg_restore_atm_CO2_target
 real::bg_gastransfer_a
 namelist / tm_namelist / bg_gastransfer_a
+real::bg_rain_ratio,bg_CaCO3_length_scale
+namelist / tm_namelist / bg_rain_ratio,bg_CaCO3_length_scale
+real::bg_martin_remin_b=-0.858
+namelist / tm_namelist / bg_martin_remin_b
 
 ! general model parameters
 integer::gen_n_tracers
@@ -125,6 +129,7 @@ integer::ioPO4,ioDOP,ioDIC,ioALK
 integer::ioCO2,ioCO3,ioH,iopCO2
 integer::iK1,iK2,iKw,iKp1,iKp2,iKp3,iKSi,iKb,iK0
 integer::iaO2,iaCO2
+integer::isPOP,isCaCO3
 
 real,dimension(:),allocatable::tm_seasonal_scale
 real,dimension(:),allocatable::tm_seasonal_rscale

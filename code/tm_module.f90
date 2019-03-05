@@ -83,6 +83,9 @@ iopCO2=4
 iaO2=1
 iaCO2=2
 
+isPOP=1
+isCaCO3=2
+
 n_ATM_tracers=2 ! n.b. 1 does not allow array operations
 !if(bg_O_select) n_ATM_tracers=n_ATM_tracers+1
 !IF(bg_C_select) n_ATM_tracers=n_ATM_tracers+1
@@ -123,8 +126,8 @@ allocate(export(tm_nbox))
 allocate(tracers_int(tm_nbox,gen_n_tracers))
 allocate(EXPORT_int(tm_nbox,n_seasonal))
 allocate(ATM_int(n_ATM_tracers))
-allocate(diag(tm_nbox,3)) ! n.b. second dimension hard-coded currently
-allocate(diag_int(tm_nbox,4)) ! n.b. second dimension hard-coded currently
+allocate(diag(tm_nbox,6)) ! n.b. second dimension hard-coded currently
+allocate(diag_int(tm_nbox,6)) ! n.b. second dimension hard-coded currently
 
 allocate(iSur(n_euphotic_boxes))
 allocate(tm_seaice_frac(n_euphotic_boxes,n_seasonal))

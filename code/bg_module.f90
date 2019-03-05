@@ -7,7 +7,10 @@ implicit none
 contains
 
 ! ---------------------------------------------------------------------------------------!
-
+! PO4_uptake
+! - calculates biological uptake of PO4
+! - updates other tracers via Redfield
+! - calculates CaCO3 export via rain-ratio
 ! ---------------------------------------------------------------------------------------!
 
 subroutine PO4_uptake()
@@ -37,14 +40,22 @@ do n=1,n_euphotic_boxes
 
 	J(n,ioPO4)=J(n,ioPO4)-uptake ! PO4
 	J(n,ioDOP)=J(n,ioDOP)+bg_DOC_frac*uptake ! DOP
-	particles(n,ioPO4)=particles(n,ioPO4)+bg_DOC_rfrac*uptake ! POP
+	particles(n,isPOP)=particles(n,ioPO4)+bg_DOC_rfrac*uptake ! POP
+
 
 	if(bg_C_select)then
+		! OM
 		J(n,ioDIC)=J(n,ioDIC)-(uptake*bg_C_to_P)
 		J(n,ioALK)=J(n,ioALK)+(uptake*bg_N_to_P)
+
+		! CaCO3 precipitation
+		particles(n,isCaCO3)=particles(n,isCaCO3)+(bg_DOC_rfrac*uptake*bg_C_to_P*bg_rain_ratio)
+		J(n,ioDIC)=J(n,ioDIC)-(bg_DOC_rfrac*uptake*bg_C_to_P*bg_rain_ratio)
+		J(n,ioALK)=J(n,ioALK)-(bg_DOC_rfrac*uptake*bg_C_to_P*bg_rain_ratio*2.0)
 	end if
 
 	diag(n,3)=uptake*tm_vol(n) ! mol
+	diag(n,6)=(bg_DOC_rfrac*uptake*bg_C_to_P*bg_rain_ratio)*tm_vol(n)
 	export(n)=uptake! export for saving output
 
 end do
@@ -92,7 +103,7 @@ subroutine POP_remin()
 
 real,dimension(tm_nbox)::remin
 
-remin=amul(Aremin,(particles(:,ioPO4))) ! POP remineralisation
+remin=amul(Aremin,(particles(:,isPOP))) ! POP remineralisation
 
 J(:,ioPO4)=J(:,ioPO4)+remin
 
@@ -422,7 +433,7 @@ end subroutine restore_atm_CO2
 
 ! ---------------------------------------------------------------------------------------!
 
-subroutine POM_remin()
+subroutine water_column()
 
 integer::n,count,nn
 integer,dimension(maxval(tm_wc))::loc_wc_start,loc_wc_end
@@ -430,8 +441,7 @@ integer,dimension(tm_nbox)::loc_wc
 real,dimension(tm_nbox)::loc_particles,loc_vol,remin,loc_depth_btm
 real::loc_poc,loc_remin_tot,loc_poc_copy
 
-! create copy of particles array (currently with export only) and reorder to water-column
-loc_particles=amul(Aconv,PARTICLES(:,ioPO4))
+! ************* Convert grid arrays to water column order ********************** !
 loc_wc=amul(Aconv,real(tm_wc))
 loc_vol=amul(Aconv,tm_vol)
 loc_depth_btm=amul(Aconv,tm_depth_btm)
@@ -448,11 +458,13 @@ do n=2,tm_nbox
 enddo
 loc_wc_end(maxval(tm_wc))=tm_nbox
 
+
+! ************* POM Remin ********************** !
 ! pre-calculate curve
 ! *** to add data!! ***
-remin=(loc_depth_btm/120.0)**(-0.858)
-!remin=merge(remin,1.0,remin<1.0) ! set anything >1.0 to 1.0
-
+print*,bg_martin_remin_b
+loc_particles=amul(Aconv,particles(:,isPOP))
+remin=(loc_depth_btm/120.0)**(bg_martin_remin_b)
 loc_particles=loc_particles*loc_vol ! mol m-3 -> mol
 
 do n=1,maxval(loc_wc)
@@ -479,19 +491,61 @@ do n=1,maxval(loc_wc)
 enddo
 
 loc_particles=loc_particles/loc_vol ! mol -> mol m-3
+! reorder particles array
+particles(:,isPOP)=amul_transpose(Aconv,loc_particles)
+
+! ************* CaCO3 Dissolution ********************** !
+loc_particles=amul(Aconv,particles(:,isCaCO3))
+loc_particles=loc_particles*loc_vol ! mol m-3 -> mol
+
+remin=exp((120.0-loc_depth_btm)/bg_CaCO3_length_scale)
+
+do n=1,maxval(loc_wc)
+	loc_remin_tot=0.0
+	loc_poc=0.0
+	loc_poc_copy=0.0
+	count=1
+	do nn=loc_wc_start(n),loc_wc_end(n)
+		if(count.le.bg_n_euphotic_lyrs)then ! surface
+			loc_poc=loc_poc+loc_particles(nn)! integrate POM in surface layers (mol)
+			loc_particles(nn)=0.0 ! set flux to zero
+			count=count+1
+		elseif(count.gt.bg_n_euphotic_lyrs)then ! interior
+			loc_particles(nn)=(remin(nn-1)-remin(nn))*loc_poc
+			loc_remin_tot=loc_remin_tot+(remin(nn-1)-remin(nn))
+			count=count+1
+		endif
+
+		! once reached the end of the wc, remin all remaining pom
+		if(nn.eq.loc_wc_end(n)) loc_particles(nn)=loc_particles(nn)+(1.0-loc_remin_tot)*loc_poc
+
+	enddo
+
+enddo
+
+loc_particles=loc_particles/loc_vol ! mol -> mol m-3
+! reorder particles array
+particles(:,isCaCO3)=amul_transpose(Aconv,loc_particles)
+
+! ************* Update other tracers ********************** !
 
 ! reorder particles array
-particles(:,ioPO4)=amul_transpose(Aconv,loc_particles)
-J(:,ioPO4)=J(:,ioPO4)+particles(:,ioPO4) ! POP remineralisation
-diag(:,4)=particles(:,ioPO4)
+J(:,ioPO4)=J(:,ioPO4)+particles(:,isPOP) ! POP remineralisation
+diag(:,4)=particles(:,isPOP)
+diag(:,5)=particles(:,isCaCo3)
 
 if(bg_C_select)then
-	J(:,ioDIC)=J(:,ioDIC)+(particles(:,ioPO4)*bg_C_to_P)
-	J(:,ioALK)=J(:,ioALK)-(particles(:,ioPO4)*bg_N_to_P)
+	! OM remineralisation
+	J(:,ioDIC)=J(:,ioDIC)+(particles(:,isPOP)*bg_C_to_P)
+	J(:,ioALK)=J(:,ioALK)-(particles(:,isPOP)*bg_N_to_P)
+
+	! CaCO3 dissolution
+	J(:,ioDIC)=J(:,ioDIC)+(particles(:,isCaCO3))
+	J(:,ioALK)=J(:,ioALK)+(particles(:,isCaCO3)*2.0)
 endif
 
 
-end subroutine POM_remin
+end subroutine water_column
 
 
 end module bg_module

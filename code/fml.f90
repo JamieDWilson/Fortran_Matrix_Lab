@@ -43,7 +43,7 @@ do t=1,gen_runtime_years*tm_n_dt
 		call PO4_uptake()
 
 		!call POP_remin()
-		call POM_remin()
+		call water_column()
 
 		call DOP_remin()
 

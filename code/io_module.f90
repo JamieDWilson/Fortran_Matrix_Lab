@@ -418,6 +418,11 @@ open(unit=10,file='../output/'//trim(gen_config_filename)//'/timeseries_POM_expo
 write(unit=10,fmt='(A100)') '% / year / global mean flux (mol yr-1) / global mean flux (mol m-2 yr-1)'
 close(unit=10)
 
+! CaCO3 EXPORT
+open(unit=10,file='../output/'//trim(gen_config_filename)//'/timeseries_CaCO3_export.dat',status='replace')
+write(unit=10,fmt='(A100)') '% / year / global mean flux (mol yr-1) / global mean flux (mol m-2 yr-1)'
+close(unit=10)
+
 
 
 end subroutine initialise_timeseries_output
@@ -488,11 +493,18 @@ sum(diag_int(:,2)), &
 sum(diag_int(:,2))/sum(tm_area(1:n_surface_boxes)) ! check this
 close(unit=10)
 
-!gas exchange
+!POM export
 open(unit=10,file='../output/'//trim(gen_config_filename)//'/timeseries_POM_export.dat',position='append')
 write(unit=10,fmt='(f12.1,e20.12)') &
 t_int , &
 sum(diag_int(:,3))
+close(unit=10)
+
+!POM export
+open(unit=10,file='../output/'//trim(gen_config_filename)//'/timeseries_CaCO3_export.dat',position='append')
+write(unit=10,fmt='(f12.1,e20.12)') &
+t_int , &
+sum(diag_int(:,6))
 close(unit=10)
 
 
@@ -555,6 +567,12 @@ status=nf90_def_var(ncid,'PO4_uptake',nf90_float,dimids,po4uptakeid)
 if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
 
 status=nf90_def_var(ncid,'POP_remin',nf90_float,dimids,popreminid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+status=nf90_def_var(ncid,'CaCO3_export',nf90_float,dimids,popreminid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+status=nf90_def_var(ncid,'CaCO3_remin',nf90_float,dimids,popreminid)
 if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
 
 !status=nf90_def_var(ncid,'EXPORT',nf90_float,dimids,EXPORTid)
@@ -636,6 +654,20 @@ if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
 status=nf90_inq_varid(ncid,'POP_remin',var_id)
 if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
 field=v2f(diag_int(:,4))
+status=nf90_put_var(ncid,var_id,field,start=(/ 1, 1, 1, timeslice_count /),count=(/NX,NY,NZ,1/))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+! ! POP remin
+status=nf90_inq_varid(ncid,'CaCO3_export',var_id)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+field=v2f(diag_int(:,6))
+status=nf90_put_var(ncid,var_id,field,start=(/ 1, 1, 1, timeslice_count /),count=(/NX,NY,NZ,1/))
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+! ! POP remin
+status=nf90_inq_varid(ncid,'CaCO3_remin',var_id)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+field=v2f(diag_int(:,5))
 status=nf90_put_var(ncid,var_id,field,start=(/ 1, 1, 1, timeslice_count /),count=(/NX,NY,NZ,1/))
 if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
 
