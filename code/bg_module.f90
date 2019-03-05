@@ -56,7 +56,8 @@ do n=1,n_euphotic_boxes
 
 	diag(n,3)=uptake*tm_vol(n) ! mol
 	diag(n,6)=(bg_DOC_rfrac*uptake*bg_C_to_P*bg_rain_ratio)*tm_vol(n)
-	export(n)=uptake! export for saving output
+
+	if(tm_save_PO4_uptake) export_save(n)=uptake! save export 
 
 end do
 

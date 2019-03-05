@@ -21,6 +21,8 @@ logical::tm_seasonal
 namelist /tm_namelist/ tm_seasonal
 character(len=100)::tm_data_fileloc
 namelist /tm_namelist/ tm_data_fileloc
+logical::tm_save_PO4_uptake=.false.
+namelist /tm_namelist/ tm_save_PO4_uptake
 
 ! biogeochemical parameters
 real::bg_uptake_tau=30.0
@@ -111,7 +113,8 @@ real,dimension(:,:),allocatable::J
 real,dimension(:,:),allocatable::Jatm
 real,dimension(:,:),allocatable::particles
 real,dimension(:),allocatable::ATM
-real,dimension(:),allocatable::export
+real,dimension(:),allocatable::export_save
+real,dimension(:,:),allocatable::export_save_int
 real,dimension(:,:),allocatable::diag
 real,dimension(:,:),allocatable::tracers_int,EXPORT_int
 real,dimension(:),allocatable::ATM_int

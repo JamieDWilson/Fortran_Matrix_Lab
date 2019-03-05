@@ -26,7 +26,6 @@ do t=1,gen_runtime_years*tm_n_dt
 
 	J(:,:)=0.0
 	particles(:,:)=0.0
-	export(:)=0.0
 	Jatm(:,:)=0.0
 
 	call tm_vars_at_dt()
@@ -53,7 +52,7 @@ do t=1,gen_runtime_years*tm_n_dt
 
 	end if
 
-	call integrate_model()
+	call timestep_fml()
 
 	call integrate_output(t,save_count,dt_count)
 
@@ -79,6 +78,7 @@ print*,
 ! write output to netcdf file
 print*,'*************************'
 call write_restart()
+call write_PO4_uptake()
 print*,'*************************'
 
 

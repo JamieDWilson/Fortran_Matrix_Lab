@@ -113,7 +113,6 @@ allocate(Aremin%col(Aremin%nnz))
 allocate(Aconv%val(tm_nbox))
 allocate(Aconv%row(tm_nbox+1))
 allocate(Aconv%col(tm_nbox))
-
 allocate(tracers(tm_nbox,gen_n_tracers))
 allocate(tracers_1(tm_nbox,gen_n_tracers))
 allocate(C(tm_nbox,4))
@@ -122,12 +121,16 @@ allocate(ATM(n_ATM_tracers))
 allocate(J(tm_nbox,gen_n_tracers))
 allocate(Jatm(n_surface_boxes,n_ATM_tracers))
 allocate(particles(tm_nbox,gen_n_tracers))
-allocate(export(tm_nbox))
 allocate(tracers_int(tm_nbox,gen_n_tracers))
-allocate(EXPORT_int(tm_nbox,n_seasonal))
 allocate(ATM_int(n_ATM_tracers))
 allocate(diag(tm_nbox,6)) ! n.b. second dimension hard-coded currently
 allocate(diag_int(tm_nbox,6)) ! n.b. second dimension hard-coded currently
+
+! if saving output for another run
+if(tm_save_PO4_uptake)then
+	allocate(export_save(n_euphotic_boxes))
+	allocate(export_save_int(n_euphotic_boxes,n_seasonal))
+endif
 
 allocate(iSur(n_euphotic_boxes))
 allocate(tm_seaice_frac(n_euphotic_boxes,n_seasonal))
@@ -145,9 +148,14 @@ allocate(tm_wc(tm_nbox))
 allocate(tm_T(n_euphotic_boxes,n_seasonal))
 allocate(tm_S(n_euphotic_boxes,n_seasonal))
 allocate(tm_silica(n_euphotic_boxes,n_seasonal))
-allocate(bg_PO4_obs(n_euphotic_boxes,n_seasonal))
-allocate(bg_PO4_uptake(n_euphotic_boxes,n_seasonal))
 allocate(bg_martin_b(tm_nbox))
+
+select case(trim(bg_uptake_function))
+case('restore')
+	allocate(bg_PO4_obs(n_euphotic_boxes,n_seasonal))
+case('fixed')
+	allocate(bg_PO4_uptake(n_euphotic_boxes,n_seasonal))
+end select
 
 allocate(seaice_dt(n_euphotic_boxes))
 allocate(wind_dt(n_euphotic_boxes))
@@ -180,7 +188,6 @@ tracers(:,:)=0.0
 J(:,:)=0.0
 tracers_int(:,:)=0.0
 ATM_int(:)=0.0
-EXPORT_int(:,:)=0.0
 diag_int(:,:)=0.0
 Jatm(:,:)=0.0
 dt_count=1 ! keep track of how many timesteps have passed in one year
@@ -375,7 +382,7 @@ end subroutine calc_seasonal_scaling
 ! - calculates Aimp*(Aexp*c+q) (Khatiwala 2007: eqn. 2)
 ! ---------------------------------------------------------------------------------------!
 
-subroutine integrate_model()
+subroutine timestep_fml()
 
 integer::n
 
@@ -395,7 +402,7 @@ enddo
 
 tracers_1=tracers
 
-end subroutine integrate_model
+end subroutine timestep_fml
 
 ! ---------------------------------------------------------------------------------------!
 
@@ -632,8 +639,17 @@ if(loc_dt_count.eq.tm_n_dt)then ! at end of model year
 		diag_int=0.0
 endif
 
+! within the last model year, save export
+if(tm_save_PO4_uptake)then
+	if(loc_t>=(gen_runtime_years*tm_n_dt)-95 .and. loc_t<=(gen_runtime_years*tm_n_dt))then
+		export_save_int(:,loc_save_count)=export_save_int(:,loc_save_count)+export_save(:)*bg_dt*(real(tm_n_dt)/real(n_seasonal))
+	endif
+	if(mod(real(loc_dt_count),real(tm_n_dt)/real(n_seasonal)).eq.0.0)then
+		loc_save_count=loc_save_count+1
+		!print*,loc_save_count
+	endif
+endif
 
-!endif
 
 end subroutine integrate_output
 
@@ -683,5 +699,6 @@ enddo
 Aconv%row(count)=count
 
 end subroutine create_Aconv
+
 
 end module tm_module

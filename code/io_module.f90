@@ -260,36 +260,36 @@ if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
 
 end subroutine
 
-! ---------------------------------------------------------------------------------------!
-! load_PO4_uptake
-! - loads PO4 uptake from previous run
-! ---------------------------------------------------------------------------------------!
-
-
-subroutine load_PO4_uptake()
-
-! local variables
-integer::n,status,loc_varid,loc_ncid
-
-!print*,'Reading in PO4uptake data from:','../data/'//trim(tm_data_fileloc)//'/'//trim(tm_PO4uptake_filename)
-
-! open netcdf file
-status=nf90_open('../data/'//trim(tm_data_fileloc)//'/'//trim(tm_PO4uptake_filename), nf90_nowrite,loc_ncid)
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),tm_PO4uptake_filename
-
-! matrix values
-status=nf90_inq_varid(loc_ncid,'PO4_Uptake',loc_varid)
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),'PO4uptake'
-
-status=nf90_get_var(loc_ncid,loc_varid,bg_PO4_uptake,start=(/ 1, 1 /),count=(/ n_euphotic_boxes , 12 /))
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),'PO4uptake'
-!print*,bg_PO4_uptake(1:10,1)
-
-! close netcdf file
-status=nf90_close(loc_ncid)
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
-
-end subroutine load_PO4_uptake
+! ! ---------------------------------------------------------------------------------------!
+! ! load_PO4_uptake
+! ! - loads PO4 uptake from previous run
+! ! ---------------------------------------------------------------------------------------!
+!
+!
+! subroutine load_PO4_uptake()
+!
+! ! local variables
+! integer::n,status,loc_varid,loc_ncid
+!
+! !print*,'Reading in PO4uptake data from:','../data/'//trim(tm_data_fileloc)//'/'//trim(tm_PO4uptake_filename)
+!
+! ! open netcdf file
+! status=nf90_open('../data/'//trim(tm_data_fileloc)//'/'//trim(tm_PO4uptake_filename), nf90_nowrite,loc_ncid)
+! if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),tm_PO4uptake_filename
+!
+! ! matrix values
+! status=nf90_inq_varid(loc_ncid,'PO4_Uptake',loc_varid)
+! if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),'PO4uptake'
+!
+! status=nf90_get_var(loc_ncid,loc_varid,bg_PO4_uptake,start=(/ 1, 1 /),count=(/ n_euphotic_boxes , 12 /))
+! if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),'PO4uptake'
+! !print*,bg_PO4_uptake(1:10,1)
+!
+! ! close netcdf file
+! status=nf90_close(loc_ncid)
+! if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+!
+! end subroutine load_PO4_uptake
 
 ! ---------------------------------------------------------------------------------------!
 ! load_Martin_b_spatial
@@ -747,6 +747,40 @@ close(10,iostat=ios)
 end subroutine load_restart
 
 ! ---------------------------------------------------------------------------------------!
+! write_PO4_uptake
+! - write fixed PO4 uptake to binary dump
+! ---------------------------------------------------------------------------------------!
+
+subroutine write_PO4_uptake()
+
+integer::ios
+
+if(tm_save_PO4_uptake)then
+	print*,'saving fixed PO4 uptake to:','../output/'//trim(gen_config_filename)//'/PO4_uptake.bin'
+	open(unit=10,form='unformatted',status='replace',action='write',iostat=ios, &
+	file='../output/'//trim(gen_config_filename)//'/PO4_uptake.bin')
+	write(10,iostat=ios) export_save_int
+	close(10,iostat=ios)
+endif
+
+end subroutine write_PO4_uptake
+
+! ---------------------------------------------------------------------------------------!
+! load_PO4_uptake
+! - load fixed PO4 uptake from binary dump
+! ---------------------------------------------------------------------------------------!
+
+subroutine load_PO4_uptake()
+
+integer::ios
+
+open(unit=10,status='old',form='unformatted',action='read',IOSTAT=ios, &
+file='../data/'//trim(tm_PO4uptake_filename))
+read(10,iostat=ios) bg_PO4_uptake
+close(10,iostat=ios)
+end subroutine load_PO4_uptake
+
+! ---------------------------------------------------------------------------------------!
 ! v2f
 ! - convert vector into field
 ! ---------------------------------------------------------------------------------------!
@@ -763,6 +797,7 @@ do n = 1,tm_nbox
 enddo
 
 end function v2f
+
 
 ! ---------------------------------------------------------------------------------------!
 ! END OF MODULE
