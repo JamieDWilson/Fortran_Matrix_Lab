@@ -71,6 +71,7 @@ do t=1,gen_runtime_years*tm_n_dt
 
 end do
 call cpu_time(finish)
+print*,'*************************'
 print*,'Time taken =',finish-start,'seconds'
 print*,'*************************'
 print*,

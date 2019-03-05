@@ -57,7 +57,7 @@ do n=1,n_euphotic_boxes
 	diag(n,3)=uptake*tm_vol(n) ! mol
 	diag(n,6)=(bg_DOC_rfrac*uptake*bg_C_to_P*bg_rain_ratio)*tm_vol(n)
 
-	if(tm_save_PO4_uptake) export_save(n)=uptake! save export 
+	if(tm_save_PO4_uptake) export_save(n)=uptake! save export
 
 end do
 
@@ -100,22 +100,22 @@ end subroutine DOP_remin
 
 ! ---------------------------------------------------------------------------------------!
 
-subroutine POP_remin()
-
-real,dimension(tm_nbox)::remin
-
-remin=amul(Aremin,(particles(:,isPOP))) ! POP remineralisation
-
-J(:,ioPO4)=J(:,ioPO4)+remin
-
-if(bg_C_select)then
-	J(:,ioDIC)=J(:,ioDIC)+(remin*bg_C_to_P)
-	J(:,ioALK)=J(:,ioALK)-(remin*bg_N_to_P)
-endif
-
-diag(:,4)=remin
-
-end subroutine POP_remin
+! subroutine POP_remin()
+!
+! real,dimension(tm_nbox)::remin
+!
+! remin=amul(Aremin,(particles(:,isPOP))) ! POP remineralisation
+!
+! J(:,ioPO4)=J(:,ioPO4)+remin
+!
+! if(bg_C_select)then
+! 	J(:,ioDIC)=J(:,ioDIC)+(remin*bg_C_to_P)
+! 	J(:,ioALK)=J(:,ioALK)-(remin*bg_N_to_P)
+! endif
+!
+! diag(:,4)=remin
+!
+! end subroutine POP_remin
 
 
 ! ---------------------------------------------------------------------------------------!

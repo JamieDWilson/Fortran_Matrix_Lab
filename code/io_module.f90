@@ -240,10 +240,10 @@ subroutine load_PO4_restore()
 ! local variables
 integer::n,status,loc_varid,loc_ncid
 
-!print*,'Reading in PO4restore data from:','../data/'//trim(tm_data_fileloc)//'/'//trim(tm_PO4restore_filename)
+print*,'loading in PO4restore data from:','../data/'//trim(tm_PO4restore_filename)
 
 ! open netcdf file
-status=nf90_open('../data/'//trim(tm_data_fileloc)//'/'//trim(tm_PO4restore_filename), nf90_nowrite,loc_ncid)
+status=nf90_open('../data/'//trim(tm_PO4restore_filename), nf90_nowrite,loc_ncid)
 if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),tm_PO4restore_filename
 
 ! matrix values
@@ -260,37 +260,6 @@ if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
 
 end subroutine
 
-! ! ---------------------------------------------------------------------------------------!
-! ! load_PO4_uptake
-! ! - loads PO4 uptake from previous run
-! ! ---------------------------------------------------------------------------------------!
-!
-!
-! subroutine load_PO4_uptake()
-!
-! ! local variables
-! integer::n,status,loc_varid,loc_ncid
-!
-! !print*,'Reading in PO4uptake data from:','../data/'//trim(tm_data_fileloc)//'/'//trim(tm_PO4uptake_filename)
-!
-! ! open netcdf file
-! status=nf90_open('../data/'//trim(tm_data_fileloc)//'/'//trim(tm_PO4uptake_filename), nf90_nowrite,loc_ncid)
-! if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),tm_PO4uptake_filename
-!
-! ! matrix values
-! status=nf90_inq_varid(loc_ncid,'PO4_Uptake',loc_varid)
-! if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),'PO4uptake'
-!
-! status=nf90_get_var(loc_ncid,loc_varid,bg_PO4_uptake,start=(/ 1, 1 /),count=(/ n_euphotic_boxes , 12 /))
-! if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),'PO4uptake'
-! !print*,bg_PO4_uptake(1:10,1)
-!
-! ! close netcdf file
-! status=nf90_close(loc_ncid)
-! if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
-!
-! end subroutine load_PO4_uptake
-
 ! ---------------------------------------------------------------------------------------!
 ! load_Martin_b_spatial
 ! - loads spatially varying field of Martin b
@@ -301,6 +270,8 @@ subroutine load_Martin_b_spatial()
 
 ! local variables
 integer::n,status,loc_varid,loc_ncid
+
+print*,'loading in spatially varying b data from:','../data/'//trim(bg_martin_b_input_filename)
 
 ! open netcdf file
 status=nf90_open('../data/'//trim(tm_data_fileloc)//'/'//trim(bg_martin_b_input_filename), nf90_nowrite,loc_ncid)
@@ -324,7 +295,6 @@ end subroutine load_Martin_b_spatial
 ! load_data_saving
 ! - loads times for saving timeslice and timeseries
 ! ---------------------------------------------------------------------------------------!
-
 
 subroutine load_data_saving()
 
@@ -728,6 +698,8 @@ file='../output/'//trim(gen_config_filename)//'/restart/restart.bin')
 write(10) tracers_1 , ATM
 close(10,iostat=ios)
 
+print*,'Restart saved to'//'../output/'//trim(gen_config_filename)//'/restart/restart.bin'
+
 end subroutine write_restart
 
 ! ---------------------------------------------------------------------------------------!
@@ -756,11 +728,12 @@ subroutine write_PO4_uptake()
 integer::ios
 
 if(tm_save_PO4_uptake)then
-	print*,'saving fixed PO4 uptake to:','../output/'//trim(gen_config_filename)//'/PO4_uptake.bin'
+
 	open(unit=10,form='unformatted',status='replace',action='write',iostat=ios, &
 	file='../output/'//trim(gen_config_filename)//'/PO4_uptake.bin')
 	write(10,iostat=ios) export_save_int
 	close(10,iostat=ios)
+	print*,'Fixed PO4 uptake saved to:','../output/'//trim(gen_config_filename)//'/PO4_uptake.bin'
 endif
 
 end subroutine write_PO4_uptake
@@ -773,7 +746,7 @@ end subroutine write_PO4_uptake
 subroutine load_PO4_uptake()
 
 integer::ios
-
+print*,'loading in fixed PO4 uptake data from:','../data/'//trim(tm_PO4uptake_filename)
 open(unit=10,status='old',form='unformatted',action='read',IOSTAT=ios, &
 file='../data/'//trim(tm_PO4uptake_filename))
 read(10,iostat=ios) bg_PO4_uptake

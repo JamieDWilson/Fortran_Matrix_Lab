@@ -93,7 +93,7 @@ n_ATM_tracers=2 ! n.b. 1 does not allow array operations
 ! set-up sparse matrices
 Aexp%nnz=tm_Aexp_nnz
 Aimp%nnz=tm_Aimp_nnz
-Aremin%nnz=tm_Aremin_nnz
+!Aremin%nnz=tm_Aremin_nnz
 
 allocate(Aexp%val_n(Aexp%nnz,n_seasonal))
 allocate(Aexp%val(Aexp%nnz))
@@ -105,10 +105,10 @@ allocate(Aimp%val(Aimp%nnz))
 allocate(Aimp%row(tm_nbox+1))
 allocate(Aimp%col(Aimp%nnz))
 
-allocate(Aremin%val_n(Aremin%nnz,1))
-allocate(Aremin%val(Aremin%nnz))
-allocate(Aremin%row(tm_nbox+1))
-allocate(Aremin%col(Aremin%nnz))
+!allocate(Aremin%val_n(Aremin%nnz,1))
+!allocate(Aremin%val(Aremin%nnz))
+!allocate(Aremin%row(tm_nbox+1))
+!allocate(Aremin%col(Aremin%nnz))
 
 allocate(Aconv%val(tm_nbox))
 allocate(Aconv%row(tm_nbox+1))
@@ -227,12 +227,26 @@ C_consts(:,:)=0.0
 !ATM(iaCO2)=278.0*1.0e-6
 
 ! print final header
+print*,
 print*,'*************************'
 print*,
 print*,'Running model...'
 print*,
 print*,'*************************'
 print*,
+print'(A7,A4,A7,A3,A8,A3,A5,A3,A8,A3,A9,A3)', &
+'       ', &
+'year', &
+'       ', &
+'PO4', &
+'        ', &
+'DOP', &
+'     ', &
+'DIC', &
+'        ', &
+'ALK', &
+'         ', &
+'CO2'
 
 call print_to_screen(0,0.0)
 
@@ -535,11 +549,13 @@ real::dum_extra,vol_rtot
 
 vol_rtot=1.0/sum(tm_vol)
 
-print*,'year',dum_t/tm_n_dt,sum(tracers_1(:,ioPO4)*tm_vol)*vol_rtot*1.0e3, &
+print'(F11.2,F11.2,F11.2,F11.2,F11.2,F11.2)', &
+real(dum_t/tm_n_dt), &
+sum(tracers_1(:,ioPO4)*tm_vol)*vol_rtot*1.0e3, &
 sum(tracers_1(:,ioDOP)*tm_vol)*vol_rtot*1.0e3, &
 sum(tracers_1(:,ioDIC)*tm_vol)*vol_rtot*1.0e3, &
 sum(tracers_1(:,ioALK)*tm_vol)*vol_rtot*1.0e3, &
-ATM(iaCO2)*1.0e6,dum_extra
+ATM(iaCO2)*1.0e6
 
 
 

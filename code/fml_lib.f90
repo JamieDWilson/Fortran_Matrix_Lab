@@ -4,66 +4,66 @@ implicit none
 save
 
 ! ******************* namelist definitions ***********************!
-! tm parameters
-CHARACTER(LEN=100)::tm_Aexp_filename,tm_Aimp_filename,tm_Aremin_filename
-namelist /tm_namelist/ tm_Aexp_filename,tm_Aimp_filename, tm_Aremin_filename
-real::tm_dt,tm_native_dt
-namelist /tm_namelist/ tm_dt,tm_native_dt
+! transport matrix parameters
+CHARACTER(LEN=100)::tm_Aexp_filename,tm_Aimp_filename
+namelist /fml_namelist/ tm_Aexp_filename,tm_Aimp_filename
+real::tm_dt,tm_native_dt=1200.0 ! currently not used
+namelist /fml_namelist/ tm_dt,tm_native_dt
 integer::tm_n_dt
 integer::tm_Aexp_nnz,tm_Aimp_nnz,tm_Aremin_nnz
 integer::tm_nbox
-namelist /tm_namelist/ tm_n_dt,tm_Aexp_nnz,tm_Aimp_nnz,tm_Aremin_nnz,tm_nbox
-character(len=100)::tm_seaice_filename,tm_PO4restore_filename,tm_vol_filename,tm_PO4uptake_filename
-namelist /tm_namelist/ tm_seaice_filename,tm_PO4restore_filename,tm_vol_filename,tm_PO4uptake_filename
+namelist /fml_namelist/ tm_n_dt,tm_Aexp_nnz,tm_Aimp_nnz,tm_Aremin_nnz,tm_nbox
+character(len=100)::tm_PO4restore_filename,tm_PO4uptake_filename
+namelist /fml_namelist/ tm_PO4restore_filename,tm_PO4uptake_filename
 character(len=100)::tm_bgc_data_filename,tm_grid_data_filename
-namelist /tm_namelist/ tm_bgc_data_filename,tm_grid_data_filename
-logical::tm_seasonal
-namelist /tm_namelist/ tm_seasonal
+namelist /fml_namelist/ tm_bgc_data_filename,tm_grid_data_filename
+logical::tm_seasonal=.true.
+namelist /fml_namelist/ tm_seasonal
 character(len=100)::tm_data_fileloc
-namelist /tm_namelist/ tm_data_fileloc
+namelist /fml_namelist/ tm_data_fileloc
 logical::tm_save_PO4_uptake=.false.
-namelist /tm_namelist/ tm_save_PO4_uptake
+namelist /fml_namelist/ tm_save_PO4_uptake
 
 ! biogeochemical parameters
 real::bg_uptake_tau=30.0
-namelist /tm_namelist/ bg_uptake_tau
+namelist /fml_namelist/ bg_uptake_tau
 real::bg_DOC_k=0.5
-namelist /tm_namelist/ bg_DOC_k
+namelist /fml_namelist/ bg_DOC_k
 real::bg_dt_ratio= 1.0
-namelist /tm_namelist/ bg_dt_ratio
+namelist /fml_namelist/ bg_dt_ratio
 real::bg_DOC_frac =0.66
-namelist / tm_namelist / bg_DOC_frac
+namelist / fml_namelist / bg_DOC_frac
 integer::bg_n_euphotic_lyrs = 2
-namelist / tm_namelist / bg_n_euphotic_lyrs
+namelist / fml_namelist / bg_n_euphotic_lyrs
 character(len=100)::bg_uptake_function = 'restore'
-namelist / tm_namelist / bg_uptake_function
+namelist / fml_namelist / bg_uptake_function
 logical::bg_O_select = .false.
-namelist / tm_namelist / bg_O_select
+namelist / fml_namelist / bg_O_select
 logical::bg_C_select = .false.
-namelist / tm_namelist / bg_C_select
+namelist / fml_namelist / bg_C_select
 logical::bg_restore_atm_CO2=.false.
-namelist / tm_namelist / bg_restore_atm_CO2
+namelist / fml_namelist / bg_restore_atm_CO2
 real::bg_restore_atm_CO2_target=278.0
-namelist / tm_namelist / bg_restore_atm_CO2_target
+namelist / fml_namelist / bg_restore_atm_CO2_target
 real::bg_gastransfer_a=6.97e-7
-namelist / tm_namelist / bg_gastransfer_a
+namelist / fml_namelist / bg_gastransfer_a
 real::bg_rain_ratio,bg_CaCO3_length_scale=2100.0
-namelist / tm_namelist / bg_rain_ratio,bg_CaCO3_length_scale
+namelist / fml_namelist / bg_rain_ratio,bg_CaCO3_length_scale
 real::bg_martin_remin_b=-0.858
-namelist / tm_namelist / bg_martin_remin_b
+namelist / fml_namelist / bg_martin_remin_b
 logical::bg_martin_remin_spatial=.false.
-namelist / tm_namelist / bg_martin_remin_spatial
+namelist / fml_namelist / bg_martin_remin_spatial
 character(len=100)::bg_martin_b_input_filename=''
-namelist /tm_namelist / bg_martin_b_input_filename
+namelist /fml_namelist / bg_martin_b_input_filename
 
 ! general model parameters
 integer::gen_n_tracers=2
-namelist / tm_namelist / gen_n_tracers
+namelist / fml_namelist / gen_n_tracers
 integer::gen_runtime_years=1
-namelist / tm_namelist / gen_runtime_years
+namelist / fml_namelist / gen_runtime_years
 character(len=100)::gen_save_timeseries_file='save_timeseries.dat'
 character(len=100)::gen_save_timeslice_file='save_timeslice.dat'
-namelist /tm_namelist/ gen_save_timeseries_file,gen_save_timeslice_file
+namelist /fml_namelist/ gen_save_timeseries_file,gen_save_timeslice_file
 
 
 ! end of namelist definitions
@@ -80,7 +80,7 @@ end type sparse
 ! define the sparse matrices
 type(sparse)::Aexp
 type(sparse)::Aimp
-type(sparse)::Aremin
+!type(sparse)::Aremin
 !type(sparse)::I ! identity matrix
 type(sparse)::Aconv ! convert indices
 
@@ -116,7 +116,7 @@ real,dimension(:),allocatable::ATM
 real,dimension(:),allocatable::export_save
 real,dimension(:,:),allocatable::export_save_int
 real,dimension(:,:),allocatable::diag
-real,dimension(:,:),allocatable::tracers_int,EXPORT_int
+real,dimension(:,:),allocatable::tracers_int
 real,dimension(:),allocatable::ATM_int
 real::t_int=0.0
 real,dimension(:,:),allocatable::diag_int
@@ -205,13 +205,13 @@ end do
 ! read in namelist file
 print*,trim(gen_config_filename)
 open(unit=20,file='../experiments/'//trim(gen_config_filename),status='old',action='read')
-read(unit=20,nml=tm_namelist,iostat=ios)
+read(unit=20,nml=fml_namelist,iostat=ios)
 close(unit=20)
 
 ! write out copy of namelist file
-!open(unit=20,file='../output/'//trim(gen_config_filename)//'/parameter_namelist.txt',status='replace')
-!write( UNIT=20, NML=tm_namelist)
-!close(unit=20)
+open(unit=20,file='../output/'//trim(gen_config_filename)//'/parameter_namelist.txt',status='replace')
+write( UNIT=20, NML=fml_namelist)
+close(unit=20)
 
 
 end subroutine load_namelist
