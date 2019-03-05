@@ -208,11 +208,6 @@ open(unit=20,file='../experiments/'//trim(gen_config_filename),status='old',acti
 read(unit=20,nml=fml_namelist,iostat=ios)
 close(unit=20)
 
-! write out copy of namelist file
-open(unit=20,file='../output/'//trim(gen_config_filename)//'/parameter_namelist.txt',status='replace')
-write( UNIT=20, NML=fml_namelist)
-close(unit=20)
-
 
 end subroutine load_namelist
 

@@ -379,6 +379,11 @@ end if
 call initialise_timeseries_output()
 call initialise_timeslice_output()
 
+! write out copy of namelist file
+open(unit=20,file='../output/'//trim(gen_config_filename)//'/parameter_namelist.txt',status='replace')
+write( UNIT=20, NML=fml_namelist)
+close(unit=20)
+
 end subroutine initialise_output
 
 ! ---------------------------------------------------------------------------------------!
