@@ -23,38 +23,44 @@ character(len=100)::tm_data_fileloc
 namelist /tm_namelist/ tm_data_fileloc
 
 ! biogeochemical parameters
-real::bg_uptake_tau
-REAL::bg_DOC_k
-namelist /tm_namelist/ bg_uptake_tau,bg_DOC_k
-real::bg_dt_ratio
+real::bg_uptake_tau=30.0
+namelist /tm_namelist/ bg_uptake_tau
+real::bg_DOC_k=0.5
+namelist /tm_namelist/ bg_DOC_k
+real::bg_dt_ratio= 1.0
 namelist /tm_namelist/ bg_dt_ratio
-character(len=100)::bg_martin_b_input_filename
-namelist /tm_namelist / bg_martin_b_input_filename
-real::bg_DOC_frac
+real::bg_DOC_frac =0.66
 namelist / tm_namelist / bg_DOC_frac
-integer::bg_n_euphotic_lyrs
+integer::bg_n_euphotic_lyrs = 2
 namelist / tm_namelist / bg_n_euphotic_lyrs
-character(len=100)::bg_uptake_function
+character(len=100)::bg_uptake_function = 'restore'
 namelist / tm_namelist / bg_uptake_function
-logical::bg_O_select,bg_C_select
-namelist / tm_namelist / bg_O_select,bg_C_select
-logical::bg_restore_atm_CO2
+logical::bg_O_select = .false.
+namelist / tm_namelist / bg_O_select
+logical::bg_C_select = .false.
+namelist / tm_namelist / bg_C_select
+logical::bg_restore_atm_CO2=.false.
 namelist / tm_namelist / bg_restore_atm_CO2
-real::bg_restore_atm_CO2_target
+real::bg_restore_atm_CO2_target=278.0
 namelist / tm_namelist / bg_restore_atm_CO2_target
-real::bg_gastransfer_a
+real::bg_gastransfer_a=6.97e-7
 namelist / tm_namelist / bg_gastransfer_a
-real::bg_rain_ratio,bg_CaCO3_length_scale
+real::bg_rain_ratio,bg_CaCO3_length_scale=2100.0
 namelist / tm_namelist / bg_rain_ratio,bg_CaCO3_length_scale
 real::bg_martin_remin_b=-0.858
 namelist / tm_namelist / bg_martin_remin_b
+logical::bg_martin_remin_spatial=.false.
+namelist / tm_namelist / bg_martin_remin_spatial
+character(len=100)::bg_martin_b_input_filename=''
+namelist /tm_namelist / bg_martin_b_input_filename
 
 ! general model parameters
-integer::gen_n_tracers
+integer::gen_n_tracers=2
 namelist / tm_namelist / gen_n_tracers
-integer::gen_runtime_years
+integer::gen_runtime_years=1
 namelist / tm_namelist / gen_runtime_years
-character(len=100)::gen_save_timeseries_file,gen_save_timeslice_file
+character(len=100)::gen_save_timeseries_file='save_timeseries.dat'
+character(len=100)::gen_save_timeslice_file='save_timeslice.dat'
 namelist /tm_namelist/ gen_save_timeseries_file,gen_save_timeslice_file
 
 

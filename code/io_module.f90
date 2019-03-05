@@ -15,8 +15,8 @@ subroutine load_TM_data()
 
 call load_TM_netcdf('../data'//'/'//trim(tm_data_fileloc)//'/'//trim(tm_Aexp_filename),Aexp)
 call load_TM_netcdf('../data'//'/'//trim(tm_data_fileloc)//'/'//trim(tm_Aimp_filename),Aimp)
-call load_TM_netcdf(tm_Aremin_filename,Aremin)
-Aremin%val=Aremin%val_n(:,1) ! tmp
+!call load_TM_netcdf(tm_Aremin_filename,Aremin)
+!Aremin%val=Aremin%val_n(:,1) ! tmp
 
 call load_TM_grid_data()
 call load_TM_bgc_data()
@@ -27,6 +27,12 @@ case('restore')
 case('fixed')
 	call load_PO4_uptake()
 end select
+
+if(bg_martin_remin_spatial)then
+	call load_Martin_b_spatial()
+else
+	bg_martin_b(:)=bg_martin_remin_b ! set global value to whole grid
+endif
 
 end subroutine load_TM_data
 
@@ -284,6 +290,35 @@ status=nf90_close(loc_ncid)
 if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
 
 end subroutine load_PO4_uptake
+
+! ---------------------------------------------------------------------------------------!
+! load_Martin_b_spatial
+! - loads spatially varying field of Martin b
+! ---------------------------------------------------------------------------------------!
+
+
+subroutine load_Martin_b_spatial()
+
+! local variables
+integer::n,status,loc_varid,loc_ncid
+
+! open netcdf file
+status=nf90_open('../data/'//trim(tm_data_fileloc)//'/'//trim(bg_martin_b_input_filename), nf90_nowrite,loc_ncid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),tm_PO4uptake_filename
+
+! matrix values
+status=nf90_inq_varid(loc_ncid,'Martin_b',loc_varid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),'Spatial_Martin_b'
+
+status=nf90_get_var(loc_ncid,loc_varid,bg_martin_b)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),'Spatial_Martin_b'
+!print*,bg_PO4_uptake(1:10,1)
+
+! close netcdf file
+status=nf90_close(loc_ncid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+end subroutine load_Martin_b_spatial
 
 ! ---------------------------------------------------------------------------------------!
 ! load_data_saving

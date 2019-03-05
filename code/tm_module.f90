@@ -147,6 +147,7 @@ allocate(tm_S(n_euphotic_boxes,n_seasonal))
 allocate(tm_silica(n_euphotic_boxes,n_seasonal))
 allocate(bg_PO4_obs(n_euphotic_boxes,n_seasonal))
 allocate(bg_PO4_uptake(n_euphotic_boxes,n_seasonal))
+allocate(bg_martin_b(tm_nbox))
 
 allocate(seaice_dt(n_euphotic_boxes))
 allocate(wind_dt(n_euphotic_boxes))

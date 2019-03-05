@@ -461,10 +461,8 @@ loc_wc_end(maxval(tm_wc))=tm_nbox
 
 ! ************* POM Remin ********************** !
 ! pre-calculate curve
-! *** to add data!! ***
-print*,bg_martin_remin_b
 loc_particles=amul(Aconv,particles(:,isPOP))
-remin=(loc_depth_btm/120.0)**(bg_martin_remin_b)
+remin=(loc_depth_btm/120.0)**(bg_martin_b)
 loc_particles=loc_particles*loc_vol ! mol m-3 -> mol
 
 do n=1,maxval(loc_wc)
