@@ -23,6 +23,7 @@ call initialise_model()
 call cpu_time(start)
 
 do t=1,gen_runtime_years*tm_n_dt
+!do t=9990*tm_n_dt,gen_runtime_years*tm_n_dt
 
 	J(:,:)=0.0
 	particles(:,:)=0.0

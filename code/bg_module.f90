@@ -40,7 +40,7 @@ do n=1,n_euphotic_boxes
 
 	J(n,ioPO4)=J(n,ioPO4)-uptake ! PO4
 	J(n,ioDOP)=J(n,ioDOP)+bg_DOC_frac*uptake ! DOP
-	particles(n,isPOP)=particles(n,ioPO4)+bg_DOC_rfrac*uptake ! POP
+	particles(n,isPOP)=particles(n,isPOP)+bg_DOC_rfrac*uptake ! POP
 
 
 	if(bg_C_select)then
@@ -439,13 +439,19 @@ subroutine water_column()
 integer::n,count,nn
 integer,dimension(maxval(tm_wc))::loc_wc_start,loc_wc_end
 integer,dimension(tm_nbox)::loc_wc
-real,dimension(tm_nbox)::loc_particles,loc_vol,remin,loc_depth_btm
-real::loc_poc,loc_remin_tot,loc_poc_copy
+real,dimension(tm_nbox)::loc_particles,loc_vol,remin,loc_depth_btm,profile,loc_particles_copy,loc_b
+real,dimension(tm_nbox)::loc_rvol
+!real::loc_poc,loc_remin_tot,loc_poc_copy
+real::layerratio,frac,pom_above
+real::start,finish
 
 ! ************* Convert grid arrays to water column order ********************** !
 loc_wc=amul(Aconv,real(tm_wc))
 loc_vol=amul(Aconv,tm_vol)
 loc_depth_btm=amul(Aconv,tm_depth_btm)
+loc_b=amul(Aconv,bg_martin_b)
+
+loc_rvol=1.0/loc_vol
 
 ! find water column starting/end points
 loc_wc_start(1)=1
@@ -462,86 +468,153 @@ loc_wc_end(maxval(tm_wc))=tm_nbox
 
 ! ************* POM Remin ********************** !
 ! pre-calculate curve
+! loc_particles=amul(Aconv,particles(:,isPOP))
+! remin=(loc_depth_btm/120.0)**(bg_martin_b)
+! loc_particles=loc_particles*loc_vol ! mol m-3 -> mol
+
+! new
 loc_particles=amul(Aconv,particles(:,isPOP))
-remin=(loc_depth_btm/120.0)**(bg_martin_b)
-loc_particles=loc_particles*loc_vol ! mol m-3 -> mol
-
+profile=(loc_depth_btm/120.0)**(loc_b)
+loc_particles_copy=loc_particles
+remin(:)=0.0
 do n=1,maxval(loc_wc)
-	loc_remin_tot=0.0
-	loc_poc=0.0
-	loc_poc_copy=0.0
-	count=1
-	do nn=loc_wc_start(n),loc_wc_end(n)
-		if(count.le.bg_n_euphotic_lyrs)then ! surface
-			loc_poc=loc_poc+loc_particles(nn)! integrate POM in surface layers (mol)
-			loc_particles(nn)=0.0 ! set flux to zero
-			count=count+1
-		elseif(count.gt.bg_n_euphotic_lyrs)then ! interior
-			loc_particles(nn)=(remin(nn-1)-remin(nn))*loc_poc
-			loc_remin_tot=loc_remin_tot+(remin(nn-1)-remin(nn))
-			count=count+1
-		endif
-
-		! once reached the end of the wc, remin all remaining pom
-		if(nn.eq.loc_wc_end(n)) loc_particles(nn)=loc_particles(nn)+(1.0-loc_remin_tot)*loc_poc
-
-	enddo
-
+    if(loc_wc_end(n)-loc_wc_start(n)==0)then ! no water column below
+        nn=loc_wc_end(n)
+        remin(nn)=loc_particles(nn)
+    elseif(loc_wc_end(n)-loc_wc_start(n)==1)then ! no water column below
+        nn=loc_wc_end(n)
+        layerratio=loc_vol(nn-1)*loc_rvol(nn)
+				pom_above=loc_particles(nn-1)*layerratio
+        remin(nn)=loc_particles(nn)+pom_above
+    else
+        do nn=loc_wc_start(n)+1,loc_wc_end(n) ! loop over water column
+            layerratio=loc_vol(nn-1)*loc_rvol(nn)
+						pom_above=loc_particles(nn-1)*layerratio
+            if(nn<=loc_wc_start(n)+1)then ! surface
+                loc_particles(nn)=loc_particles(nn)+pom_above! add particles from layer above
+                loc_particles(nn-1)=0.0
+            elseif(nn>loc_wc_start(n)+1 .and. nn<loc_wc_end(n))then ! interior
+                frac=(profile(nn)/profile(nn-1))
+                loc_particles(nn)=pom_above*frac
+                remin(nn)=pom_above-loc_particles(nn)
+            else
+                loc_particles(nn)=0.0
+                remin(nn)=pom_above-loc_particles(nn)
+            endif
+        enddo
+    endif
+    !print*,n,loc_wc_end(n)-loc_wc_start(n),sum(remin(loc_wc_start(n):loc_wc_end(n))* &
+		!loc_vol(loc_wc_start(n):loc_wc_end(n))) &
+		!/sum(loc_vol(loc_wc_start(n):loc_wc_end(n))) - &
+    !sum(loc_particles_copy(loc_wc_start(n):loc_wc_end(n))*loc_vol(loc_wc_start(n):loc_wc_end(n))) &
+		!/sum(loc_vol(loc_wc_start(n):loc_wc_end(n)))
 enddo
+!print*,n,sum(remin*loc_vol)/sum(loc_vol)-sum(loc_particles_copy*loc_vol)/sum(loc_vol)
 
-loc_particles=loc_particles/loc_vol ! mol -> mol m-3
-! reorder particles array
-particles(:,isPOP)=amul_transpose(Aconv,loc_particles)
+remin=amul_transpose(Aconv,remin)
+J(:,ioPO4)=J(:,ioPO4)+remin ! POP remineralisation
+diag(:,4)=remin
+if(bg_C_select)then
+	! OM remineralisation
+	J(:,ioDIC)=J(:,ioDIC)+remin*bg_C_to_P
+	J(:,ioALK)=J(:,ioALK)-remin*bg_N_to_P
+endif
 
 ! ************* CaCO3 Dissolution ********************** !
 loc_particles=amul(Aconv,particles(:,isCaCO3))
-loc_particles=loc_particles*loc_vol ! mol m-3 -> mol
-
-remin=exp((120.0-loc_depth_btm)/bg_CaCO3_length_scale)
-
+profile=exp((120.0-loc_depth_btm)/bg_CaCO3_length_scale)
+loc_particles_copy=loc_particles
+remin(:)=0.0
 do n=1,maxval(loc_wc)
-	loc_remin_tot=0.0
-	loc_poc=0.0
-	loc_poc_copy=0.0
-	count=1
-	do nn=loc_wc_start(n),loc_wc_end(n)
-		if(count.le.bg_n_euphotic_lyrs)then ! surface
-			loc_poc=loc_poc+loc_particles(nn)! integrate POM in surface layers (mol)
-			loc_particles(nn)=0.0 ! set flux to zero
-			count=count+1
-		elseif(count.gt.bg_n_euphotic_lyrs)then ! interior
-			loc_particles(nn)=(remin(nn-1)-remin(nn))*loc_poc
-			loc_remin_tot=loc_remin_tot+(remin(nn-1)-remin(nn))
-			count=count+1
-		endif
-
-		! once reached the end of the wc, remin all remaining pom
-		if(nn.eq.loc_wc_end(n)) loc_particles(nn)=loc_particles(nn)+(1.0-loc_remin_tot)*loc_poc
-
-	enddo
-
+    if(loc_wc_end(n)-loc_wc_start(n)==0)then ! no water column below
+        nn=loc_wc_end(n)
+        remin(nn)=loc_particles(nn)
+    elseif(loc_wc_end(n)-loc_wc_start(n)==1)then ! no water column below
+        nn=loc_wc_end(n)
+        layerratio=loc_vol(nn-1)*loc_rvol(nn)
+				pom_above=loc_particles(nn-1)*layerratio
+        remin(nn)=loc_particles(nn)+pom_above
+    else
+        do nn=loc_wc_start(n)+1,loc_wc_end(n) ! loop over water column
+            layerratio=loc_vol(nn-1)*loc_rvol(nn)
+						pom_above=loc_particles(nn-1)*layerratio
+            if(nn<=loc_wc_start(n)+1)then ! surface
+                loc_particles(nn)=loc_particles(nn)+pom_above! add particles from layer above
+                loc_particles(nn-1)=0.0
+            elseif(nn>loc_wc_start(n)+1 .and. nn<loc_wc_end(n))then ! interior
+                frac=(profile(nn)/profile(nn-1))
+                loc_particles(nn)=pom_above*frac
+                remin(nn)=pom_above-loc_particles(nn)
+            else
+                loc_particles(nn)=0.0
+                remin(nn)=pom_above-loc_particles(nn)
+            endif
+        enddo
+    endif
+    !print*,n,loc_wc_end(n)-loc_wc_start(n),sum(remin(loc_wc_start(n):loc_wc_end(n))* &
+		!loc_vol(loc_wc_start(n):loc_wc_end(n))) &
+		!/sum(loc_vol(loc_wc_start(n):loc_wc_end(n))) - &
+    !sum(loc_particles_copy(loc_wc_start(n):loc_wc_end(n))*loc_vol(loc_wc_start(n):loc_wc_end(n))) &
+		!/sum(loc_vol(loc_wc_start(n):loc_wc_end(n)))
 enddo
 
-loc_particles=loc_particles/loc_vol ! mol -> mol m-3
-! reorder particles array
-particles(:,isCaCO3)=amul_transpose(Aconv,loc_particles)
+remin=amul_transpose(Aconv,remin)
+J(:,ioDIC)=J(:,ioDIC)+remin ! CaCO3 dissolution
+J(:,ioALK)=J(:,ioALK)+remin*2.0 ! CO32-
+diag(:,5)=remin
 
-! ************* Update other tracers ********************** !
 
-! reorder particles array
-J(:,ioPO4)=J(:,ioPO4)+particles(:,isPOP) ! POP remineralisation
-diag(:,4)=particles(:,isPOP)
-diag(:,5)=particles(:,isCaCo3)
-
-if(bg_C_select)then
-	! OM remineralisation
-	J(:,ioDIC)=J(:,ioDIC)+(particles(:,isPOP)*bg_C_to_P)
-	J(:,ioALK)=J(:,ioALK)-(particles(:,isPOP)*bg_N_to_P)
-
-	! CaCO3 dissolution
-	J(:,ioDIC)=J(:,ioDIC)+(particles(:,isCaCO3))
-	J(:,ioALK)=J(:,ioALK)+(particles(:,isCaCO3)*2.0)
-endif
+! loc_particles=amul(Aconv,particles(:,isCaCO3))
+! loc_particles=loc_particles*loc_vol ! mol m-3 -> mol
+!
+! remin=exp((120.0-loc_depth_btm)/bg_CaCO3_length_scale)
+!
+! do n=1,maxval(loc_wc)
+! 	loc_remin_tot=0.0
+! 	loc_poc=0.0
+! 	loc_poc_copy=0.0
+! 	count=1
+! 	do nn=loc_wc_start(n),loc_wc_end(n)
+! 		if(count.le.bg_n_euphotic_lyrs)then ! surface
+! 			loc_poc=loc_poc+loc_particles(nn)! integrate POM in surface layers (mol)
+! 			loc_particles(nn)=0.0 ! set flux to zero
+! 			count=count+1
+! 		elseif(count.gt.bg_n_euphotic_lyrs)then ! interior
+! 			loc_particles(nn)=(remin(nn-1)-remin(nn))*loc_poc
+! 			loc_remin_tot=loc_remin_tot+(remin(nn-1)-remin(nn))
+! 			count=count+1
+! 		endif
+!
+! 		! once reached the end of the wc, remin all remaining pom
+! 		if(nn.eq.loc_wc_end(n)) loc_particles(nn)=loc_particles(nn)+(1.0-loc_remin_tot)*loc_poc
+!
+! 	enddo
+!
+! enddo
+!
+! loc_particles=loc_particles/loc_vol ! mol -> mol m-3
+! ! reorder particles array
+! particles(:,isCaCO3)=amul_transpose(Aconv,loc_particles)
+!
+! ! ************* Update other tracers ********************** !
+!
+! ! reorder particles array
+! ! J(:,ioPO4)=J(:,ioPO4)+particles(:,isPOP) ! POP remineralisation
+! ! diag(:,4)=particles(:,isPOP)
+! ! diag(:,5)=particles(:,isCaCo3)
+! J(:,ioPO4)=J(:,ioPO4)+particles(:,isPOP) ! POP remineralisation
+! diag(:,4)=particles(:,isPOP)
+! diag(:,5)=particles(:,isCaCo3)
+!
+! if(bg_C_select)then
+! 	! OM remineralisation
+! 	J(:,ioDIC)=J(:,ioDIC)+(particles(:,isPOP)*bg_C_to_P)
+! 	J(:,ioALK)=J(:,ioALK)-(particles(:,isPOP)*bg_N_to_P)
+!
+! 	! CaCO3 dissolution
+! 	J(:,ioDIC)=J(:,ioDIC)+(particles(:,isCaCO3))
+! 	J(:,ioALK)=J(:,ioALK)+(particles(:,isCaCO3)*2.0)
+! endif
 
 
 end subroutine water_column

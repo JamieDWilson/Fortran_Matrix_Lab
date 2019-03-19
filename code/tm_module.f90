@@ -484,7 +484,7 @@ end subroutine timestep_fml
 ! ---------------------------------------------------------------------------------------!
 ! amul
 ! - matrix-vector multiplication (CSR Format)
-! - adapted from SPARSKIT
+! - adapted from SPARSEKIT (https://people.sc.fsu.edu/~jburkardt/f_src/sparsekit/sparsekit.html)
 ! ---------------------------------------------------------------------------------------!
 
 FUNCTION amul(A,vector)
@@ -513,7 +513,7 @@ end FUNCTION
 ! ---------------------------------------------------------------------------------------!
 ! amul_transpose
 ! - matrix transpose - vector multiplication (CSR Format)
-! - adapted from SPARSKIT
+! - adapted from SPARSEKIT (https://people.sc.fsu.edu/~jburkardt/f_src/sparsekit/sparsekit.html)
 ! ---------------------------------------------------------------------------------------!
 
 FUNCTION amul_transpose(A,vector)
@@ -537,6 +537,181 @@ do n=1,size(vector)
 end do
 
 end FUNCTION
+
+! ---------------------------------------------------------------------------------------!
+! amub
+! - matrix * matrix (CSR Format) (assuming square matrices of same size)
+! - adapted from SPARSEKIT (https://people.sc.fsu.edu/~jburkardt/f_src/sparsekit/sparsekit.html)
+! ---------------------------------------------------------------------------------------!
+
+! FUNCTION amub(A,B)
+! ! output
+! type(sparse),intent(inout)::amub
+! ! dummy
+! type(sparse),intent(in)::A
+! type(sparse),intent(in)::B
+! ! local
+! integer::n,nn,i
+! real::sum_val
+! real,dimension(tm_nbox)::tmp
+!
+! integer::len
+! integer,dimension(size(A%row))::ic
+! integer,dimension(tm_nbox)::iw
+! integer::ka,ii,kb,jj,k
+! real::scal
+! integer::nzmax,ncol,nrow
+!
+! nzmax=size(A%val) ! number of nnz's
+! ncol=tm_nbox ! size of col (assumes square matrix)
+! nrow=tm_nbox ! size of row (assumes square matrix)
+!
+!
+!
+! len = 0
+! ic(1) = 1
+! !
+! !  Initialize IW.
+! !
+! iw(1:ncol) = 0
+!
+! do ii = 1, nrow
+! !
+! !  Row I.
+! !
+! 	do ka = A%row(ii), A%row(ii+1)-1
+!
+!
+! 		scal = A%val(ka)
+!
+!
+! 		jj = B%col(ka)
+!
+! 		do kb = B%row(jj), B%row(jj+1)-1
+!
+! 				 jcol = B%col(kb)
+! 				 jpos = iw(jcol)
+!
+! 				 if ( jpos == 0 ) then
+! 						len = len + 1
+! 						if ( nzmax < len ) then
+! 							 ierr = ii
+! 							 return
+! 						end if
+! 						amub%col(len) = jcol
+! 						iw(jcol)= len
+! 						if ( values ) then
+! 							amub%val(len) = scal * B%val(kb)
+! 						end if
+! 				 else
+! 						if ( values ) then
+! 							amub%val(jpos) = amub%val(jpos) + scal * B%val(kb)
+! 						end if
+! 				 end if
+!
+! 			 end do
+!
+! 	end do
+!
+! 	do k = amub%row(ii), len
+! 		iw(amub%col(k)) = 0
+! 	end do
+!
+! 	amub%row(ii+1) = len + 1
+!
+! end do
+!
+! return
+! end
+!
+! end FUNCTION amub
+
+! ---------------------------------------------------------------------------------------!
+! aplb
+! - matrix + matrix (CSR Format)
+! - adapted from SPARSEKIT (https://people.sc.fsu.edu/~jburkardt/f_src/sparsekit/sparsekit.html)
+! ---------------------------------------------------------------------------------------!
+
+! FUNCTION aplb(A,B)
+! ! output
+! type(sparse),intent(inout)::amplb
+! ! dummy
+! type(sparse),intent(in)::A
+! type(sparse),intent(in)::B
+! ! local
+! integer::n,nn,i
+! real::sum_val
+! real,dimension(tm_nbox)::tmp
+!
+! integer::len
+! integer,dimension(size(A%row))::ic
+! integer,dimension(tm_nbox)::iw
+! integer::ka,ii,kb,jj,k
+! real::scal
+! integer::nzmax,ncol,nrow
+!
+! nzmax=size(A%val) ! number of nnz's
+! ncol=tm_nbox ! size of col (assumes square matrix)
+! nrow=tm_nbox ! size of row (assumes square matrix)
+!
+! ierr = 0
+! len = 0
+! ic(1) = 1
+! iw(1:ncol) = 0
+!
+! do ii = 1, nrow
+! !
+! !  Row I.
+! !
+! 	 do ka = A%row(ii), A%row(ii+1)-1
+!
+! 			len = len + 1
+! 			jcol = A%col(ka)
+!
+! 			if ( nzmax < len ) then
+! 				ierr = ii
+! 				return
+! 			end if
+!
+! 			aplb%col(len) = jcol
+! 			aplb%val(len) = A%val(ka)
+! 			iw(jcol) = len
+! 	 end do
+!
+! 	 do kb = B%row(ii), B%row(ii+1)-1
+!
+! 			jcol = B%col(kb)
+! 			jpos = iw(jcol)
+!
+! 			if ( jpos == 0 ) then
+!
+! 				 len = len + 1
+!
+! 				 if ( nzmax < len ) then
+! 					 ierr = ii
+! 					 return
+! 				 end if
+!
+! 				 aplb%col(len) = jcol
+! 				 aplb%val(len) = B%val(kb)
+! 				 iw(jcol)= len
+! 			else
+! 				 aplb%val(jpos) = aplb%val(jpos) + B%val(kb)
+! 			end if
+!
+! 	 end do
+!
+! 	 do k = aplb%row(ii), len
+! 		 iw(aplb%col(k)) = 0
+! 	 end do
+!
+! 	 aplb%row(ii+1) = len+1
+! end do
+!
+! return
+! end
+!
+! end function aplb
 
 ! ---------------------------------------------------------------------------------------!
 
@@ -657,13 +832,16 @@ endif
 
 ! within the last model year, save export
 if(tm_save_PO4_uptake)then
-	if(loc_t>=(gen_runtime_years*tm_n_dt)-95 .and. loc_t<=(gen_runtime_years*tm_n_dt))then
+
+	if(loc_t>=(gen_runtime_years*tm_n_dt)-95 .and. loc_t<=(gen_runtime_years*tm_n_dt))then ! if within final year
 		export_save_int(:,loc_save_count)=export_save_int(:,loc_save_count)+export_save(:)*bg_dt*(real(tm_n_dt)/real(n_seasonal))
+
+		if(mod(real(loc_dt_count),real(tm_n_dt)/real(n_seasonal)).eq.0.0)then ! step through seasons
+			loc_save_count=loc_save_count+1
+		endif
+
 	endif
-	if(mod(real(loc_dt_count),real(tm_n_dt)/real(n_seasonal)).eq.0.0)then
-		loc_save_count=loc_save_count+1
-		!print*,loc_save_count
-	endif
+
 endif
 
 

@@ -274,8 +274,8 @@ integer::n,status,loc_varid,loc_ncid
 print*,'loading in spatially varying b data from:','../data/'//trim(bg_martin_b_input_filename)
 
 ! open netcdf file
-status=nf90_open('../data/'//trim(tm_data_fileloc)//'/'//trim(bg_martin_b_input_filename), nf90_nowrite,loc_ncid)
-if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),tm_PO4uptake_filename
+status=nf90_open('../data/'//'/'//trim(bg_martin_b_input_filename), nf90_nowrite,loc_ncid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),bg_martin_b_input_filename
 
 ! matrix values
 status=nf90_inq_varid(loc_ncid,'Martin_b',loc_varid)
