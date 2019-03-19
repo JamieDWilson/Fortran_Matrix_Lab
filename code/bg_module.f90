@@ -30,10 +30,8 @@ do n=1,n_euphotic_boxes
 		((tm_seasonal_rscale(dt_count))*bg_PO4_obs(:,tm_seasonal_n2(dt_count)))
 		if(tracers_1(n,ioPO4)>tmp_PO4(n)) uptake=seaice_dt(n)*bg_uptake_tau*(tracers_1(n,ioPO4)-tmp_PO4(n)) ! PO4 uptake
 	case('fixed')
-		tmp_PO4=(tm_seasonal_scale(dt_count)*bg_PO4_uptake(:,tm_seasonal_n1(dt_count)))&
-		+ &
-		(tm_seasonal_rscale(dt_count)*bg_PO4_uptake(:,tm_seasonal_n2(dt_count)))
-		if(tracers_1(n,ioPO4)-(tmp_PO4(n)*bg_dt)>0.0) uptake=tmp_PO4(n) ! PO4 uptake
+		uptake=0.0 ! set to zero initially, update if
+		if(tracers_1(n,ioPO4)-(bg_PO4_uptake(n,dt_count)*bg_dt)>0.0) uptake=bg_PO4_uptake(n,dt_count) ! PO4 uptake
 	case('abiotic')
 		uptake=0.0
 	end select

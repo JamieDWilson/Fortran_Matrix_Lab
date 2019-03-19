@@ -129,7 +129,7 @@ allocate(diag_int(tm_nbox,6)) ! n.b. second dimension hard-coded currently
 ! if saving output for another run
 if(tm_save_PO4_uptake)then
 	allocate(export_save(n_euphotic_boxes))
-	allocate(export_save_int(n_euphotic_boxes,n_seasonal))
+	allocate(export_save_int(n_euphotic_boxes,tm_n_dt))
 endif
 
 allocate(iSur(n_euphotic_boxes))
@@ -154,7 +154,7 @@ select case(trim(bg_uptake_function))
 case('restore')
 	allocate(bg_PO4_obs(n_euphotic_boxes,n_seasonal))
 case('fixed')
-	allocate(bg_PO4_uptake(n_euphotic_boxes,n_seasonal))
+	allocate(bg_PO4_uptake(n_euphotic_boxes,tm_n_dt))
 end select
 
 allocate(seaice_dt(n_euphotic_boxes))
@@ -833,13 +833,18 @@ endif
 ! within the last model year, save export
 if(tm_save_PO4_uptake)then
 
+	! if(loc_t>=(gen_runtime_years*tm_n_dt)-95 .and. loc_t<=(gen_runtime_years*tm_n_dt))then ! if within final year
+	! 	export_save_int(:,loc_save_count)=export_save_int(:,loc_save_count)+export_save(:)*bg_dt*(real(tm_n_dt)/real(n_seasonal))
+	!
+	! 	if(mod(real(loc_dt_count),real(tm_n_dt)/real(n_seasonal)).eq.0.0)then ! step through seasons
+	! 		loc_save_count=loc_save_count+1
+	! 	endif
+	!
+	! endif
+
 	if(loc_t>=(gen_runtime_years*tm_n_dt)-95 .and. loc_t<=(gen_runtime_years*tm_n_dt))then ! if within final year
-		export_save_int(:,loc_save_count)=export_save_int(:,loc_save_count)+export_save(:)*bg_dt*(real(tm_n_dt)/real(n_seasonal))
-
-		if(mod(real(loc_dt_count),real(tm_n_dt)/real(n_seasonal)).eq.0.0)then ! step through seasons
-			loc_save_count=loc_save_count+1
-		endif
-
+		export_save_int(:,loc_save_count)=export_save(:)
+		loc_save_count=loc_save_count+1
 	endif
 
 endif
