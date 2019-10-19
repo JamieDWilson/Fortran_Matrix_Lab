@@ -46,19 +46,75 @@ print*,
 print*,'Initialising model...'
 print*,
 
-call calc_seasonal_scaling()
+! -- set-up output files-- !
 call load_data_saving()
 call initialise_output()
 
-! for defining iSur
-if(bg_n_euphotic_lyrs.eq.1)then
-	n_euphotic_boxes=4448
-elseif(bg_n_euphotic_lyrs.eq.2)then
-	n_euphotic_boxes=8840
-end if
+! -- set-up Transport Matrices -- !
+call load_TM_metadata('../data'//'/'//trim(tm_data_fileloc)//'/'//trim(tm_Aexp_filename),Aexp)
+call load_TM_metadata('../data'//'/'//trim(tm_data_fileloc)//'/'//trim(tm_Aimp_filename),Aimp)
 
-n_surface_boxes=4448
+allocate(Aexp%val_n(Aexp%nnz,Aexp%n_time))
+allocate(Aexp%val(Aexp%nnz))
+allocate(Aexp%row(Aexp%nb+1))
+allocate(Aexp%col(Aexp%nnz))
 
+allocate(Aimp%val_n(Aimp%nnz,Aimp%n_time))
+allocate(Aimp%val(Aimp%nnz))
+allocate(Aimp%row(Aimp%nb+1))
+allocate(Aimp%col(Aimp%nnz))
+
+call load_TM_netcdf('../data'//'/'//trim(tm_data_fileloc)//'/'//trim(tm_Aexp_filename),Aexp)
+call load_TM_netcdf('../data'//'/'//trim(tm_data_fileloc)//'/'//trim(tm_Aimp_filename),Aimp)
+
+call set_TM_timestep()
+
+tm_nbox=Aexp%nb
+n_seasonal=Aexp%n_time
+
+! -- load Transport Matrid grid -- !
+allocate(tm_i(tm_nbox))
+allocate(tm_j(tm_nbox))
+allocate(tm_k(tm_nbox))
+allocate(tm_lon(tm_nbox))
+allocate(tm_lat(tm_nbox))
+allocate(tm_depth(tm_nbox))
+allocate(tm_depth_btm(tm_nbox))
+allocate(tm_area(tm_nbox))
+allocate(tm_vol(tm_nbox))
+allocate(tm_wc(tm_nbox))
+call load_TM_grid_data()
+
+n_euphotic_boxes=0
+n_surface_boxes=0
+do n=1,tm_nbox
+	if(tm_k(n).le.bg_n_euphotic_lyrs) n_euphotic_boxes=n_euphotic_boxes+1
+	if(tm_k(n).eq.1) n_surface_boxes=n_surface_boxes+1
+end do
+call find_water_columns()
+
+allocate(Aconv%val(tm_nbox))
+allocate(Aconv%row(tm_nbox+1))
+allocate(Aconv%col(tm_nbox))
+call create_Aconv()
+
+! -- load boundary condition data -- !
+allocate(tm_T(n_euphotic_boxes,n_seasonal))
+allocate(tm_S(n_euphotic_boxes,n_seasonal))
+allocate(tm_silica(n_euphotic_boxes,n_seasonal))
+allocate(bg_martin_b(tm_nbox))
+allocate(tm_seaice_frac(n_euphotic_boxes,n_seasonal))
+allocate(tm_windspeed(n_euphotic_boxes,n_seasonal))
+call load_TM_bgc_data()
+
+allocate(seaice_dt(n_euphotic_boxes))
+allocate(wind_dt(n_euphotic_boxes))
+allocate(T_dt(n_euphotic_boxes))
+allocate(S_dt(n_euphotic_boxes))
+allocate(silica_dt(n_euphotic_boxes))
+
+! -- set-up model arrays -- !
+call calc_seasonal_scaling()
 ! tracer indices
 ioPO4=1
 ioDOP=2
@@ -90,29 +146,7 @@ n_ATM_tracers=2 ! n.b. 1 does not allow array operations
 !if(bg_O_select) n_ATM_tracers=n_ATM_tracers+1
 !IF(bg_C_select) n_ATM_tracers=n_ATM_tracers+1
 
-! set-up sparse matrices
-Aexp%nnz=tm_Aexp_nnz
-Aimp%nnz=tm_Aimp_nnz
-!Aremin%nnz=tm_Aremin_nnz
 
-allocate(Aexp%val_n(Aexp%nnz,n_seasonal))
-allocate(Aexp%val(Aexp%nnz))
-allocate(Aexp%row(tm_nbox+1))
-allocate(Aexp%col(Aexp%nnz))
-
-allocate(Aimp%val_n(Aimp%nnz,n_seasonal))
-allocate(Aimp%val(Aimp%nnz))
-allocate(Aimp%row(tm_nbox+1))
-allocate(Aimp%col(Aimp%nnz))
-
-!allocate(Aremin%val_n(Aremin%nnz,1))
-!allocate(Aremin%val(Aremin%nnz))
-!allocate(Aremin%row(tm_nbox+1))
-!allocate(Aremin%col(Aremin%nnz))
-
-allocate(Aconv%val(tm_nbox))
-allocate(Aconv%row(tm_nbox+1))
-allocate(Aconv%col(tm_nbox))
 allocate(tracers(tm_nbox,gen_n_tracers))
 allocate(tracers_1(tm_nbox,gen_n_tracers))
 allocate(C(tm_nbox,4))
@@ -132,24 +166,6 @@ if(tm_save_PO4_uptake)then
 	allocate(export_save_int(n_euphotic_boxes,tm_n_dt))
 endif
 
-allocate(iSur(n_euphotic_boxes))
-allocate(tm_seaice_frac(n_euphotic_boxes,n_seasonal))
-allocate(tm_windspeed(n_euphotic_boxes,n_seasonal))
-allocate(tm_area(tm_nbox))
-allocate(tm_vol(tm_nbox))
-allocate(tm_i(tm_nbox))
-allocate(tm_j(tm_nbox))
-allocate(tm_k(tm_nbox))
-allocate(tm_lon(tm_nbox))
-allocate(tm_lat(tm_nbox))
-allocate(tm_depth(tm_nbox))
-allocate(tm_depth_btm(tm_nbox))
-allocate(tm_wc(tm_nbox))
-allocate(tm_T(n_euphotic_boxes,n_seasonal))
-allocate(tm_S(n_euphotic_boxes,n_seasonal))
-allocate(tm_silica(n_euphotic_boxes,n_seasonal))
-allocate(bg_martin_b(tm_nbox))
-
 select case(trim(bg_uptake_function))
 case('restore')
 	allocate(bg_PO4_obs(n_euphotic_boxes,n_seasonal))
@@ -157,24 +173,7 @@ case('fixed')
 	allocate(bg_PO4_uptake(n_euphotic_boxes,tm_n_dt))
 end select
 
-allocate(seaice_dt(n_euphotic_boxes))
-allocate(wind_dt(n_euphotic_boxes))
-allocate(T_dt(n_euphotic_boxes))
-allocate(S_dt(n_euphotic_boxes))
-allocate(silica_dt(n_euphotic_boxes))
-
-call load_TM_data()
-call find_water_columns()
-call create_Aconv()
-
-
-! surface indices (are the first 4448 entries to the vector)
-do n=1,n_euphotic_boxes
-	iSur(n)=n
-end do
-
-
-! initialise tracer array
+! -- initialise model arrays -- !
 if(gen_restart_select)then
 	call load_restart()
 else
@@ -193,9 +192,6 @@ Jatm(:,:)=0.0
 dt_count=1 ! keep track of how many timesteps have passed in one year
 
 ! convert parameters to correct units
-tm_dt=1.0/real(tm_n_dt) ! TMM timestep
-bg_dt=tm_dt*bg_dt_ratio ! BGC timestep
-
 
 bg_DOC_rfrac=1.0-bg_DOC_frac ! reciprical of DOC fraction
 !bg_DOC_k=1.0/bg_DOC_k ! year-1
@@ -252,6 +248,36 @@ call print_to_screen(0,0.0)
 
 
 end subroutine initialise_model
+
+! ---------------------------------------------------------------------------------------!
+
+! ---------------------------------------------------------------------------------------!
+
+subroutine set_TM_timestep()
+
+! local variables
+integer::n,nn
+
+! Aexp = I+m(Aexp)
+Aexp%val_n=Aexp%val_n*tm_dt_scale*tm_native_dt
+
+do n=1,Aexp%nb
+	do nn=Aexp%row(n),Aexp%row(n+1)-1
+		if(Aexp%col(nn).eq.n) Aexp%val_n(nn,:)=1.0+Aexp%val_n(nn,:)
+	end do
+end do
+
+! Aimp = Aimp^m
+!do n=1,int(tm_dt_scale)
+	call amub(Aimp,Aimp)
+!end do
+
+! timestep
+tm_dt=tm_native_dt*tm_dt_scale*(1.0/(60.0*60.0*24.0*360.0)) ! yr
+bg_dt=tm_dt*bg_dt_ratio ! BGC timestep
+tm_n_dt=nint(1.0/tm_dt)
+
+end subroutine set_TM_timestep
 
 ! ---------------------------------------------------------------------------------------!
 
@@ -632,10 +658,10 @@ type(sparse),intent(in)::B
 ! local
 integer::n,nn,i,s
 real::sum_val
-real,dimension(tm_nbox)::tmp
+real,dimension(A%nb)::tmp
 integer::len
 integer::ierr
-integer,dimension(tm_nbox)::iw
+integer,dimension(A%nb)::iw
 integer::ka,ii,kb,jj,k
 integer::jcol,jpos
 real::scal
@@ -644,17 +670,17 @@ integer,dimension(size(A%row))::ic
 integer,allocatable,dimension(:)::jc
 real,allocatable,dimension(:,:)::c
 
-ncol=tm_nbox ! size of col (assumes square matrix)
-nrow=tm_nbox ! size of row (assumes square matrix)
+ncol=A%nb ! size of col (assumes square matrix)
+nrow=A%nb ! size of row (assumes square matrix)
 
 ! find nnz's of new matrix
 nzmax=amub_nnz(A,B)
 
 ! allocate working arrays
 allocate(jc(nzmax))
-allocate(c(nzmax,n_seasonal))
+allocate(c(nzmax,A%n_time))
 
-do s = 1, n_seasonal
+do s = 1, A%n_time
 
 len = 0
 ic(1) = 1
@@ -708,19 +734,21 @@ end do
 end do ! seasonal loop
 
 ! set A to C=A*B
-deallocate(A%val_n)
-deallocate(A%col)
+if(nzmax.ne.B%nnz)then
+	deallocate(A%val_n)
+	deallocate(A%col)
 
-allocate(A%val_n(nzmax,n_seasonal))
-allocate(A%col(nzmax))
+	allocate(A%val_n(nzmax,A%n_time))
+	allocate(A%col(nzmax))
+end if
 
 A%val_n=c
 A%col=jc
 A%row=ic
 A%nnz=nzmax
 
-deallocate(c)
-deallocate(jc)
+!deallocate(c)
+!deallocate(jc)
 
 end subroutine amub
 

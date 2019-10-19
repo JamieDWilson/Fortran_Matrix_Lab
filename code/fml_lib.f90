@@ -7,15 +7,16 @@ save
 ! transport matrix parameters
 CHARACTER(LEN=100)::tm_Aexp_filename,tm_Aimp_filename
 namelist /fml_namelist/ tm_Aexp_filename,tm_Aimp_filename
-real::tm_dt,tm_native_dt=1200.0 ! currently not used
-namelist /fml_namelist/ tm_dt,tm_native_dt
+real::tm_native_dt=1200.0
+real::tm_dt_scale=1
+namelist /fml_namelist/tm_native_dt,tm_dt_scale
 integer::tm_n_dt
-integer::tm_Aexp_nnz,tm_Aimp_nnz,tm_Aremin_nnz
 integer::tm_nbox
-namelist /fml_namelist/ tm_n_dt,tm_Aexp_nnz,tm_Aimp_nnz,tm_Aremin_nnz,tm_nbox
+namelist /fml_namelist/ tm_n_dt,tm_nbox
 character(len=100)::tm_PO4restore_filename,tm_PO4uptake_filename
 namelist /fml_namelist/ tm_PO4restore_filename,tm_PO4uptake_filename
-character(len=100)::tm_bgc_data_filename,tm_grid_data_filename
+character(len=100)::tm_bgc_data_filename='TMM_MIT_data.nc'
+character(len=100)::tm_grid_data_filename='TMM_MIT_grid.nc'
 namelist /fml_namelist/ tm_bgc_data_filename,tm_grid_data_filename
 logical::tm_seasonal=.true.
 namelist /fml_namelist/ tm_seasonal
@@ -61,8 +62,8 @@ integer::gen_n_tracers=2
 namelist / fml_namelist / gen_n_tracers
 integer::gen_runtime_years=1
 namelist / fml_namelist / gen_runtime_years
-character(len=100)::gen_save_timeseries_file='save_timeseries.dat'
-character(len=100)::gen_save_timeslice_file='save_timeslice.dat'
+character(len=100)::gen_save_timeseries_file
+character(len=100)::gen_save_timeslice_file
 namelist /fml_namelist/ gen_save_timeseries_file,gen_save_timeslice_file
 
 
@@ -75,6 +76,8 @@ type sparse
 	integer(KIND=4),allocatable,dimension(:)::row
 	integer(KIND=4),allocatable,dimension(:)::col
 	integer::nnz
+	integer::nb
+	integer::n_time
 end type sparse
 
 ! define the sparse matrices
@@ -177,6 +180,8 @@ integer::timeslice_count=1
 integer::NZ = 15;
 integer::NY = 64;
 integer::NX = 128;
+
+real::tm_dt
 
 contains
 ! ---------------------------------------------------------------------------------------!

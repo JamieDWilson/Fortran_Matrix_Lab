@@ -61,6 +61,7 @@ if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),'A_val'
 
 status=nf90_get_var(loc_ncid,loc_varid,dum_A%val_n)
 if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),'A_val'
+!print*,dum_A%val_n(1:10,1)
 
 ! matrix column indices
 status=nf90_inq_varid(loc_ncid,'A_col',loc_varid)
@@ -84,6 +85,54 @@ if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
 
 
 end subroutine load_TM_netcdf
+
+! ---------------------------------------------------------------------------------------!
+! load_TM_metadata
+! - loads transport matrix meta data (nonzeros,row/col size,number of matrices)
+! ---------------------------------------------------------------------------------------!
+
+SUBROUTINE load_TM_metadata(dum_filename,dum_A)
+
+character(len=*)::dum_filename
+type(sparse)::dum_A
+
+integer::loc_ncid,loc_varid,status
+character(len=100)::loc_lname
+
+! open netcdf file
+status=nf90_open(trim(dum_filename),nf90_nowrite,loc_ncid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),dum_filename
+
+! nonzeros
+status=nf90_inq_varid(loc_ncid,'nnz',loc_varid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),'nnz'
+
+status=nf90_get_var(loc_ncid,loc_varid,dum_A%nnz)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),'nnz'
+!print*,dum_A%nnz
+
+! nonzeros
+status=nf90_inq_varid(loc_ncid,'nb',loc_varid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),'nb'
+
+status=nf90_get_var(loc_ncid,loc_varid,dum_A%nb)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),'nb'
+!print*,dum_A%nb
+
+! nonzeros
+status=nf90_inq_varid(loc_ncid,'n_season',loc_varid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),'n_time'
+
+status=nf90_get_var(loc_ncid,loc_varid,dum_A%n_time)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status)),'n_time'
+!print*,dum_A%n_time
+
+! close netcdf file
+status=nf90_close(loc_ncid)
+if(status /= nf90_NoErr) print*,trim(nf90_strerror(status))
+
+
+end subroutine load_TM_metadata
 
 ! ---------------------------------------------------------------------------------------!
 ! load_TM_grid_data
