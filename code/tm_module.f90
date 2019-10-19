@@ -22,7 +22,7 @@ integer,dimension(8)::value
 call date_and_time(date,time,zone,value)
 print*,
 print*,'**************************'
-print*,'*** Fortran Matrix Lab ***'
+print*,'*** Fortran (Transport) Matrix Lab ***'
 print*,'**************************'
 print*,''
 print '(1x,I4,A1,I2,A1,I2)',value(1),'/',value(2),'/',value(3)
@@ -539,92 +539,190 @@ end do
 end FUNCTION
 
 ! ---------------------------------------------------------------------------------------!
-! amub
-! - matrix * matrix (CSR Format) (assuming square matrices of same size)
+! amub_nnz
+! - nonzeros in matrix * matrix (CSR Format) (assuming square matrices of same size)
 ! - adapted from SPARSEKIT (https://people.sc.fsu.edu/~jburkardt/f_src/sparsekit/sparsekit.html)
 ! ---------------------------------------------------------------------------------------!
+function amub_nnz(A,B)
+! output
+integer::amub_nnz
+! dummy
+type(sparse),intent(in)::A
+type(sparse),intent(in)::B
+! local
+integer::ncol
+integer::ncolb
+integer::nrow
+integer::ii
+integer,dimension(size(A%row)-1)::iw
+integer::j
+integer::jc
+integer::jr
+integer::k
+integer::last
+integer::ldg
+integer,dimension(size(A%row)-1)::ndegr
 
-! FUNCTION amub(A,B)
-! ! output
-! type(sparse),intent(inout)::amub
-! ! dummy
-! type(sparse),intent(in)::A
-! type(sparse),intent(in)::B
-! ! local
-! integer::n,nn,i
-! real::sum_val
-! real,dimension(tm_nbox)::tmp
+! assuming square matrices of same size
+ncol=size(A%row)-1
+ncolb=size(A%row)-1
+nrow=size(A%row)-1
+
+iw(1:ncolb) = 0
+ndegr(1:nrow) = 0
+
+do ii = 1, nrow
 !
-! integer::len
-! integer,dimension(size(A%row))::ic
-! integer,dimension(tm_nbox)::iw
-! integer::ka,ii,kb,jj,k
-! real::scal
-! integer::nzmax,ncol,nrow
+!  For each row of A.
 !
-! nzmax=size(A%val) ! number of nnz's
-! ncol=tm_nbox ! size of col (assumes square matrix)
-! nrow=tm_nbox ! size of row (assumes square matrix)
+	ldg = 0
 !
+!  End-of-linked list.
 !
+	last = -1
+
+	do j = A%row(ii), A%row(ii+1)-1
 !
-! len = 0
-! ic(1) = 1
-! !
-! !  Initialize IW.
-! !
-! iw(1:ncol) = 0
+!  Row number to be added.
 !
-! do ii = 1, nrow
-! !
-! !  Row I.
-! !
-! 	do ka = A%row(ii), A%row(ii+1)-1
+			jr = A%col(j)
+
+			do k = B%row(jr), B%row(jr+1)-1
+				 jc = B%col(k)
 !
+!  Add one element to the linked list.
 !
-! 		scal = A%val(ka)
+				 if ( iw(jc) == 0 ) then
+						ldg = ldg + 1
+						iw(jc) = last
+						last = jc
+				 end if
+
+			 end do
+
+	end do
+
+	ndegr(ii) = ldg
 !
+!  Reset IW to zero.
 !
-! 		jj = B%col(ka)
+	do k = 1, ldg
+		j = iw(last)
+		iw(last) = 0
+		last = j
+	 end do
+
+end do
+
+! output nnz of A*B
+amub_nnz = sum ( ndegr(1:nrow) )
+
+end function
+
+! ---------------------------------------------------------------------------------------!
+! amub
+! - matrix * matrix (CSR Format) (assuming square matrices of same size)
+! - replaces input A with result C=A*B
+! - adapted from SPARSEKIT (https://people.sc.fsu.edu/~jburkardt/f_src/sparsekit/sparsekit.html)
+! ---------------------------------------------------------------------------------------!
+subroutine amub(A,B)
+! dummy
+type(sparse),intent(inout)::A
+type(sparse),intent(in)::B
+! local
+integer::n,nn,i,s
+real::sum_val
+real,dimension(tm_nbox)::tmp
+integer::len
+integer::ierr
+integer,dimension(tm_nbox)::iw
+integer::ka,ii,kb,jj,k
+integer::jcol,jpos
+real::scal
+integer::nzmax,ncol,nrow
+integer,dimension(size(A%row))::ic
+integer,allocatable,dimension(:)::jc
+real,allocatable,dimension(:,:)::c
+
+ncol=tm_nbox ! size of col (assumes square matrix)
+nrow=tm_nbox ! size of row (assumes square matrix)
+
+! find nnz's of new matrix
+nzmax=amub_nnz(A,B)
+
+! allocate working arrays
+allocate(jc(nzmax))
+allocate(c(nzmax,n_seasonal))
+
+do s = 1, n_seasonal
+
+len = 0
+ic(1) = 1
 !
-! 		do kb = B%row(jj), B%row(jj+1)-1
+!  Initialize IW.
 !
-! 				 jcol = B%col(kb)
-! 				 jpos = iw(jcol)
+iw(1:ncol) = 0
+
+do ii = 1, nrow
 !
-! 				 if ( jpos == 0 ) then
-! 						len = len + 1
-! 						if ( nzmax < len ) then
-! 							 ierr = ii
-! 							 return
-! 						end if
-! 						amub%col(len) = jcol
-! 						iw(jcol)= len
-! 						if ( values ) then
-! 							amub%val(len) = scal * B%val(kb)
-! 						end if
-! 				 else
-! 						if ( values ) then
-! 							amub%val(jpos) = amub%val(jpos) + scal * B%val(kb)
-! 						end if
-! 				 end if
+!  Row I.
 !
-! 			 end do
-!
-! 	end do
-!
-! 	do k = amub%row(ii), len
-! 		iw(amub%col(k)) = 0
-! 	end do
-!
-! 	amub%row(ii+1) = len + 1
-!
-! end do
-!
-! return
-! end
-!
-! end FUNCTION amub
+	do ka = A%row(ii), A%row(ii+1)-1
+
+
+		scal = A%val_n(ka,s)
+
+
+		jj = B%col(ka)
+
+		do kb = B%row(jj), B%row(jj+1)-1
+
+				 jcol = B%col(kb)
+				 jpos = iw(jcol)
+
+				 if ( jpos == 0 ) then
+						len = len + 1
+						if ( nzmax < len ) then
+							 ierr = ii
+							 return
+						end if
+						jc(len) = jcol
+						iw(jcol)= len
+						c(len,s) = scal * B%val_n(kb,s)
+				 else
+							c(jpos,s) = c(jpos,s) + scal * B%val_n(kb,s)
+				 end if
+
+		end do
+
+	end do
+
+	do k = ic(ii), len
+		iw(jc(k)) = 0
+	end do
+
+	ic(ii+1) = len + 1
+
+end do
+
+end do ! seasonal loop
+
+! set A to C=A*B
+deallocate(A%val_n)
+deallocate(A%col)
+
+allocate(A%val_n(nzmax,n_seasonal))
+allocate(A%col(nzmax))
+
+A%val_n=c
+A%col=jc
+A%row=ic
+A%nnz=nzmax
+
+deallocate(c)
+deallocate(jc)
+
+end subroutine amub
 
 ! ---------------------------------------------------------------------------------------!
 ! aplb
