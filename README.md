@@ -12,10 +12,13 @@ Current status (2020): I am updating this repository so that the code is availab
 3) download the transport matrix files
 
 # Running FML
-1) create an experiment file in the experiment directory
-2) within the code directory, run the makefile to compile the code
-3) to run the experiment from cold: ./FML <experiment_name> <number of years>
-4) to run from a restart: ./FML <experiment_name> <number of years> <restart_experiment_name>
+1) create an experiment file in the `experiment` directory
+2) within the `code` directory, run the makefile to compile the code
+3) to run the experiment, run the FML executible with 2 or 3 arguments:
+  - the experiment name
+  - number of years to run
+  - name of an experiment to restart from (optional)
+4) e.g., `./FML initial_experiment 10 restart_experiment
 5) output is written to netcdf and text files in the output directory under the experiment name
   
 # Documentation
