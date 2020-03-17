@@ -18,7 +18,7 @@ Current status (2020): I am updating this repository so that the code is availab
   - the experiment name
   - number of years to run
   - name of an experiment to restart from (optional)
-4) e.g., `./FML initial_experiment 10 restart_experiment
+4) e.g., `./FML initial_experiment 10 restart_experiment`
 5) output is written to netcdf and text files in the output directory under the experiment name
   
 # Documentation
