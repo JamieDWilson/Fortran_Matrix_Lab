@@ -257,6 +257,7 @@ subroutine set_TM_timestep()
 
 ! local variables
 integer::n,nn
+real::exponent,t
 
 ! Aexp = I+m(Aexp)
 Aexp%val_n=Aexp%val_n*tm_dt_scale*tm_native_dt
@@ -267,10 +268,44 @@ do n=1,Aexp%nb
 	end do
 end do
 
-! Aimp = Aimp^m
-!do n=1,int(tm_dt_scale)
-	call amub(Aimp,Aimp)
-!end do
+! allocate temporary Aimp copy
+! Aimp accumulates results
+allocate(Apow1%val_n(Aimp%nnz,Aimp%n_time))
+allocate(Apow1%val(Aimp%nnz))
+allocate(Apow1%row(Aimp%nb+1))
+allocate(Apow1%col(Aimp%nnz))
+
+! copy Aimp
+Apow1%val_n=Aimp%val_n
+Apow1%val=Aimp%val
+Apow1%row=Aimp%row
+Apow1%col=Aimp%col
+Apow1%nnz=Aimp%nnz
+Apow1%nb=Aimp%nb
+Apow1%n_time=Aimp%n_time
+
+! calculate Aimp**tm_dt_scale
+exponent=tm_dt_scale
+do
+	t=mod(exponent,2.0)
+	exponent=floor(exponent/2.0)
+
+	if(t.eq.1.0)then
+		call amub(Aimp,Apow1)
+	endif
+
+	if(exponent.eq.0.0)then
+		exit
+	endif
+
+	call amub(Apow1,Apow1)
+enddo
+
+! deallocate temporary Aimp copy
+deallocate(Apow1%val_n)
+deallocate(Apow1%val)
+deallocate(Apow1%row)
+deallocate(Apow1%col)
 
 ! timestep
 tm_dt=tm_native_dt*tm_dt_scale*(1.0/(60.0*60.0*24.0*360.0)) ! yr
@@ -735,11 +770,13 @@ end do ! seasonal loop
 
 ! set A to C=A*B
 if(nzmax.ne.B%nnz)then
-	deallocate(A%val_n)
-	deallocate(A%col)
-
-	allocate(A%val_n(nzmax,A%n_time))
-	allocate(A%col(nzmax))
+	! deallocate(A%val_n)
+	! deallocate(A%col)
+	!
+	! allocate(A%val_n(nzmax,A%n_time))
+	! allocate(A%col(nzmax))
+	print*,'fatal error - A*B results in different number of nonzeros'
+	stop
 end if
 
 A%val_n=c

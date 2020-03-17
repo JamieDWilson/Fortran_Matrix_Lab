@@ -87,6 +87,7 @@ type(sparse)::Aimp
 !type(sparse)::I ! identity matrix
 type(sparse)::Aconv ! convert indices
 
+type(sparse)::Apow1 ! A**1 for set_TM_timestep()
 
 ! ******************* allocatable ***********************!
 real,dimension(:,:),allocatable::tm_seaice_frac
