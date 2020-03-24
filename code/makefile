@@ -1,14 +1,17 @@
 # compile Fortran_Matrix_Lab
-# defining variables
+
+# load user options
+include user.mak
+
+# define variables
 objects = fml.o fml_lib.o io_module.o tm_module.o bg_module.o
-compiler = gfortran
-switch = -O3 -fdefault-real-8
-netcdf_switch = -L/share/apps/netcdf-4.0/gcc-4.4.7/lib -lnetcdf
+switch = -O3 -fdefault-real-8 
+profile_switch = -pg
 
 # Makefile
 
 FML: $(objects)
-	$(compiler) $(switch) $(objects) $(netcdf_switch) -o FML
+	$(compiler) $(switch) $(objects) -L$(netcdf_switch)/lib $(netcdf_lib) -o FML
 
 fml_lib.mod: fml_lib.o fml_lib.f90
 	$(compiler) -c $(switch) fml_lib.f90
@@ -16,9 +19,9 @@ fml_lib.o: fml_lib.f90
 	$(compiler) -c $(switch) fml_lib.f90
 
 io_module.mod: io_module.o io_module.f90
-	$(compiler) -c $(switch) -I/share/apps/netcdf-4.0/gcc-4.4.7/include io_module.f90
+	$(compiler) -c $(switch) -I$(netcdf_switch)/include io_module.f90
 io_module.o: fml_lib.mod io_module.f90
-	$(compiler) -c $(switch) -I/share/apps/netcdf-4.0/gcc-4.4.7/include io_module.f90
+	$(compiler) -c $(switch) -I$(netcdf_switch)/include io_module.f90
 
 tm_module.mod: tm_module.o tm_module.f90
 	$(compiler) -c $(switch) tm_module.f90
@@ -33,7 +36,11 @@ bg_module.o: fml_lib.mod bg_module.f90
 fml.o: fml_lib.mod io_module.mod tm_module.mod bg_module.mod fml.f90
 	$(compiler) -c $(switch) fml.f90
 
-# Cleaning 
+# Profiling
+profile: $(objects)
+	$(compiler) $(switch) $(profile_switch) $(objects) -L$(netcdf_switch)/lib $(netcdf_lib) -o FML
+
+# Cleaning
 clean:
 	rm fml_lib.mod fml_lib.o io_module.mod io_module.o tm_module.mod tm_module.o bg_module.mod bg_module.o fml.o
 

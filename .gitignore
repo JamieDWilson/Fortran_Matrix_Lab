@@ -5,3 +5,4 @@ experiments/
 log/
 output/
 code/FML
+*.gcno
