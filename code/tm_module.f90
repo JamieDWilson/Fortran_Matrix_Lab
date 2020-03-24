@@ -39,7 +39,7 @@ integer,dimension(8)::value
 
 ! print header text to screen
 call date_and_time(date,time,zone,value)
-print*,
+print*,''
 print*,'**************************'
 print*,'*** Fortran (Transport) Matrix Lab ***'
 print*,'**************************'
@@ -48,22 +48,22 @@ print '(1x,I4,A1,I2,A1,I2)',value(1),'/',value(2),'/',value(3)
 print '(1x,I2,A1,I2,A1,I2)',value(5),':',value(6),':',value(7)
 print*,''
 print*,'*************************'
-print*,
+print*,''
 print*,'Input Directory:'
 print*,'../data'//'/'//trim(tm_data_fileloc)
-PRINT*,
+PRINT*,''
 if(gen_restart_select)then
 print*,'Restart Directory:'
 print*,'../output/'//trim(gen_restart_filename)
-PRINT*,
+PRINT*,''
 end if
 print*,'Output Directory:'
 print*,'../output/'//trim(gen_config_filename)
-print*,
+print*,''
 print*,'*************************'
-print*,
+print*,''
 print*,'Initialising model...'
-print*,
+print*,''
 
 ! -- set-up output files-- !
 call load_data_saving()
@@ -242,13 +242,13 @@ C_consts(:,:)=0.0
 !ATM(iaCO2)=278.0*1.0e-6
 
 ! print final header
-print*,
+print*,''
 print*,'*************************'
-print*,
+print*,''
 print*,'Running model...'
-print*,
+print*,''
 print*,'*************************'
-print*,
+print*,''
 print'(A7,A4,A7,A3,A8,A3,A5,A3,A8,A3,A9,A3)', &
 '       ', &
 'year', &

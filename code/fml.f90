@@ -85,7 +85,7 @@ call cpu_time(finish)
 print*,'*************************'
 print*,'Time taken =',finish-start,'seconds'
 print*,'*************************'
-print*,
+print*,''
 
 ! write output to netcdf file
 print*,'*************************'
