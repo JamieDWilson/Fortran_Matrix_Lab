@@ -1,0 +1,7 @@
+# ignore everything
+*
+
+# but not these file
+!.gitignore
+!save_timeslice.dat
+!save_timeseries.dat
