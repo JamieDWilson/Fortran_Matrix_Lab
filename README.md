@@ -8,12 +8,12 @@ Current status (2020): I am updating this repository so that the code is availab
 
 # Setting up FML
 1) download or clone the code here
-2) edit `code/user.mak` with your compiler, netcdf library location and library name
+2) edit `user.mak` with your compiler, netcdf library location and library name
 3) download the transport matrix files
 
 # Running FML
-1) create an experiment file in the `experiment` directory
-2) within the `code` directory, run `make` to compile the code
+1) create an experiment file in the `experiment` directory (see `expeiment/example_experiment`)
+2) run `make` to compile the code
 3) to run the experiment, run the FML executible with 2 or 3 arguments:
   - the experiment name
   - number of years to run
