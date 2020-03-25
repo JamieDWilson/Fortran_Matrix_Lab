@@ -24,21 +24,23 @@ subroutine PO4_uptake()
 
 integer::n
 real::uptake
-real,dimension(n_euphotic_boxes)::tmp_PO4
+real::tmp_PO4
+real::tmp_tracer
 
 do n=1,n_euphotic_boxes
 
 	uptake=0.0
+	tmp_tracer=tracers_1(n,ioPO4)
 
 	select case(trim(bg_uptake_function))
 	case('restore')
-		tmp_PO4=(tm_seasonal_scale(dt_count)*bg_PO4_obs(:,tm_seasonal_n1(dt_count)))&
+		tmp_PO4=(tm_seasonal_scale(dt_count)*bg_PO4_obs(n,tm_seasonal_n1(dt_count)))&
 		+ &
-		((tm_seasonal_rscale(dt_count))*bg_PO4_obs(:,tm_seasonal_n2(dt_count)))
-		if(tracers_1(n,ioPO4)>tmp_PO4(n)) uptake=seaice_dt(n)*bg_uptake_tau*(tracers_1(n,ioPO4)-tmp_PO4(n)) ! PO4 uptake
+		((tm_seasonal_rscale(dt_count))*bg_PO4_obs(n,tm_seasonal_n2(dt_count)))
+		if(tmp_tracer>tmp_PO4) uptake=seaice_dt(n)*bg_uptake_tau*(tmp_tracer-tmp_PO4) ! PO4 uptake
 	case('fixed')
 		uptake=0.0 ! set to zero initially, update if
-		if(tracers_1(n,ioPO4)-(bg_PO4_uptake(n,dt_count)*bg_dt)>0.0) uptake=bg_PO4_uptake(n,dt_count) ! PO4 uptake
+		if(tmp_tracer-(bg_PO4_uptake(n,dt_count)*bg_dt)>0.0) uptake=bg_PO4_uptake(n,dt_count) ! PO4 uptake
 	case('abiotic')
 		uptake=0.0
 	end select
