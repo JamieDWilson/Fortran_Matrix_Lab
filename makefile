@@ -4,37 +4,37 @@
 include user.mak
 
 # define variables
-objects = code/fml.o code/fml_lib.o code/io_module.o code/tm_module.o code/bg_module.o
+objects = src/fml.o src/fml_lib.o src/io_module.o src/tm_module.o src/bg_module.o
 switch = -O3 -fdefault-real-8
-src_dir = code
+src_dir = src
 
 # Makefile
 
 FML: $(objects)
 	$(compiler) $(switch) $(objects) -L$(netcdf_switch)/lib $(netcdf_lib) -o FML
 
-code/fml_lib.mod: code/fml_lib.o code/fml_lib.f90
-	$(compiler) -c $(switch) code/fml_lib.f90 -o $@
-code/fml_lib.o: code/fml_lib.f90
-	$(compiler) -c $(switch) code/fml_lib.f90 -o $@
+src/fml_lib.mod: src/fml_lib.o src/fml_lib.f90
+	$(compiler) -c $(switch) src/fml_lib.f90 -o $@
+src/fml_lib.o: src/fml_lib.f90
+	$(compiler) -c $(switch) src/fml_lib.f90 -o $@
 
-code/io_module.mod: code/io_module.o code/io_module.f90
-	$(compiler) -c $(switch) -I$(netcdf_switch)/include code/io_module.f90 -o $@
-code/io_module.o: code/fml_lib.mod code/io_module.f90
-	$(compiler) -c $(switch) -I$(netcdf_switch)/include code/io_module.f90 -o $@
+src/io_module.mod: src/io_module.o src/io_module.f90
+	$(compiler) -c $(switch) -I$(netcdf_switch)/include src/io_module.f90 -o $@
+src/io_module.o: src/fml_lib.mod src/io_module.f90
+	$(compiler) -c $(switch) -I$(netcdf_switch)/include src/io_module.f90 -o $@
 
-code/tm_module.mod: code/tm_module.o code/tm_module.f90
-	$(compiler) -c $(switch) code/tm_module.f90 -o $@
-code/tm_module.o: code/fml_lib.mod code/tm_module.f90
-	$(compiler) -c $(switch) code/tm_module.f90 -o $@
+src/tm_module.mod: src/tm_module.o src/tm_module.f90
+	$(compiler) -c $(switch) src/tm_module.f90 -o $@
+src/tm_module.o: src/fml_lib.mod src/tm_module.f90
+	$(compiler) -c $(switch) src/tm_module.f90 -o $@
 
-code/bg_module.mod: code/bg_module.o code/bg_module.f90
-	$(compiler) -c $(switch) code/bg_module.f90 -o $@
-code/bg_module.o: code/fml_lib.mod code/bg_module.f90
-	$(compiler) -c $(switch) code/bg_module.f90 -o $@
+src/bg_module.mod: src/bg_module.o src/bg_module.f90
+	$(compiler) -c $(switch) src/bg_module.f90 -o $@
+src/bg_module.o: src/fml_lib.mod src/bg_module.f90
+	$(compiler) -c $(switch) src/bg_module.f90 -o $@
 
-code/fml.o: code/fml_lib.mod code/io_module.mod code/tm_module.mod code/bg_module.mod code/fml.f90
-	$(compiler) -c $(switch) code/fml.f90 -o $@
+src/fml.o: src/fml_lib.mod src/io_module.mod src/tm_module.mod src/bg_module.mod src/fml.f90
+	$(compiler) -c $(switch) src/fml.f90 -o $@
 
 # Profiling
 profile: switch = -O3 -fdefault-real-8 -pg -g
@@ -43,7 +43,6 @@ profile: $(objects)
 
 # Cleaning
 clean:
-	rm code/*.mod code/*.o
-	#rm fml_lib.mod fml_lib.o io_module.mod io_module.o tm_module.mod tm_module.o bg_module.mod bg_module.o fml.o
+	rm src/*.mod src/*.o
 
 # End of makefile
