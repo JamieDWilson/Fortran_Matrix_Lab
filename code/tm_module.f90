@@ -50,15 +50,15 @@ print*,''
 print*,'*************************'
 print*,''
 print*,'Input Directory:'
-print*,'../data'//'/'//trim(tm_data_fileloc)
+print*,'data'//'/'//trim(tm_data_fileloc)
 PRINT*,''
 if(gen_restart_select)then
 print*,'Restart Directory:'
-print*,'../output/'//trim(gen_restart_filename)
+print*,'output/'//trim(gen_restart_filename)
 PRINT*,''
 end if
 print*,'Output Directory:'
-print*,'../output/'//trim(gen_config_filename)
+print*,'output/'//trim(gen_config_filename)
 print*,''
 print*,'*************************'
 print*,''
@@ -70,8 +70,8 @@ call load_data_saving()
 call initialise_output()
 
 ! -- set-up Transport Matrices -- !
-call load_TM_metadata('../data'//'/'//trim(tm_data_fileloc)//'/'//trim(tm_Aexp_filename),Aexp)
-call load_TM_metadata('../data'//'/'//trim(tm_data_fileloc)//'/'//trim(tm_Aimp_filename),Aimp)
+call load_TM_metadata('data'//'/'//trim(tm_data_fileloc)//'/'//trim(tm_Aexp_filename),Aexp)
+call load_TM_metadata('data'//'/'//trim(tm_data_fileloc)//'/'//trim(tm_Aimp_filename),Aimp)
 
 allocate(Aexp%val_n(Aexp%nnz,Aexp%n_time))
 allocate(Aexp%val(Aexp%nnz))
@@ -83,8 +83,8 @@ allocate(Aimp%val(Aimp%nnz))
 allocate(Aimp%row(Aimp%nb+1))
 allocate(Aimp%col(Aimp%nnz))
 
-call load_TM_netcdf('../data'//'/'//trim(tm_data_fileloc)//'/'//trim(tm_Aexp_filename),Aexp)
-call load_TM_netcdf('../data'//'/'//trim(tm_data_fileloc)//'/'//trim(tm_Aimp_filename),Aimp)
+call load_TM_netcdf('data'//'/'//trim(tm_data_fileloc)//'/'//trim(tm_Aexp_filename),Aexp)
+call load_TM_netcdf('data'//'/'//trim(tm_data_fileloc)//'/'//trim(tm_Aimp_filename),Aimp)
 
 call set_TM_timestep()
 

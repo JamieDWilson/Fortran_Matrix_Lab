@@ -325,7 +325,7 @@ end do
 
 ! read in namelist file
 print*,trim(gen_config_filename)
-open(unit=20,file='../experiments/'//trim(gen_config_filename),status='old',action='read')
+open(unit=20,file='experiments/'//trim(gen_config_filename),status='old',action='read')
 read(unit=20,nml=fml_namelist,iostat=ios)
 close(unit=20)
 
