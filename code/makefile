@@ -5,8 +5,7 @@ include user.mak
 
 # define variables
 objects = fml.o fml_lib.o io_module.o tm_module.o bg_module.o
-switch = -O3 -fdefault-real-8 
-profile_switch = -pg
+switch = -O3 -fdefault-real-8
 
 # Makefile
 
@@ -37,6 +36,7 @@ fml.o: fml_lib.mod io_module.mod tm_module.mod bg_module.mod fml.f90
 	$(compiler) -c $(switch) fml.f90
 
 # Profiling
+profile: switch = -O3 -fdefault-real-8 -pg -g
 profile: $(objects)
 	$(compiler) $(switch) $(profile_switch) $(objects) -L$(netcdf_switch)/lib $(netcdf_lib) -o FML
 
