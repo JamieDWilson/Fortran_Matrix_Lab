@@ -3,3 +3,4 @@
 
 # but not these files
 !.gitignore
+!example_experiment
